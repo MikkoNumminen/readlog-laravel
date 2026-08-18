@@ -160,6 +160,17 @@ jobs:
             echo DB::connection()->getDriverName(), " books=", App\Models\Book::count(), PHP_EOL;
             if (DB::connection()->getDriverName() !== "sqlite" || App\Models\Book::count() < 1) exit(1);'
 
+      - name: Behind a tunnel, links are https and the session cookie is Secure
+        # cloudflared terminates TLS and forwards plain HTTP with these headers.
+        # nginx passes them to php-fpm and TRUSTED_PROXIES=* makes the app believe
+        # them. This is the tunnel minus Cloudflare, which CI cannot open.
+        run: |
+          curl -fsS -D headers.txt -o page.html             -H "Host: demo.trycloudflare.com" -H "X-Forwarded-Proto: https" -H "X-Forwarded-For: 203.0.113.9"             http://127.0.0.1:8080/
+          grep -q 'href="https://demo.trycloudflare.com/library"' page.html
+          ! grep -q 'http://localhost' page.html
+          grep -i '^set-cookie: readlog-session=' headers.txt | grep -qi 'secure'
+          docker compose exec -T app php artisan readlog:smoke --url=http://web
+
       - name: A second start migrates nothing and seeds nothing
         run: |
           docker compose restart app

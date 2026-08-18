@@ -14,8 +14,18 @@
 #
 #     docker compose -f compose.yaml -f compose.postgres.yaml up --build
 #
+# To put the running app on a temporary public URL (a demo, an interview), add the
+# tunnel profile. It runs Cloudflare's cloudflared in quick-tunnel mode, which
+# needs no Cloudflare account, and prints the https://....trycloudflare.com URL:
+#
+#     docker compose --profile tunnel up tunnel        # Ctrl-C closes it
+#
+# scripts/tunnel-up.sh and scripts/tunnel-down.sh wrap that and print only the
+# URL. DEMO.md is the five-minute version of all of this.
+#
 # Optional settings are read from the shell or from a .env file next to this
-# file: APP_PORT (default 8080), GOOGLE_BOOKS_API_KEY (default unset).
+# file: APP_PORT (default 8080), GOOGLE_BOOKS_API_KEY (default unset),
+# CLOUDFLARE_TUNNEL_TOKEN (only for the named-tunnel profile).
 
 name: readlog
 
@@ -32,6 +42,11 @@ services:
       # request (artisan commands, the smoke check). Inside a request the request's
       # own host and scheme are used, which is what makes a tunnel work.
       APP_URL: http://localhost:${APP_PORT:-8080}
+      # The app only ever sees nginx, and nginx only ever sees the browser or the
+      # tunnel. Trusting the caller is what makes X-Forwarded-Proto: https from
+      # cloudflared turn into https links and a Secure session cookie. See
+      # config/trustedproxy.php.
+      TRUSTED_PROXIES: "*"
       # Everything the app writes goes to stderr, so `docker compose logs app` is
       # the log. Nothing is written to storage/logs.
       LOG_CHANNEL: stderr
@@ -78,6 +93,34 @@ services:
       timeout: 3s
       retries: 5
       start_period: 15s
+
+  # --- On-demand public exposure. Both are profiles, so a plain `up` never starts
+  # them; nothing leaves the machine unless asked. ---------------------------------
+
+  tunnel:
+    # Quick tunnel: no account, no DNS, a random *.trycloudflare.com hostname that
+    # lives as long as this container does. Cloudflare terminates TLS and forwards
+    # to nginx over the compose network with X-Forwarded-Proto: https.
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: "no"
+
+  tunnel-named:
+    # Named tunnel: a stable hostname on a domain you control, through a free
+    # Cloudflare account. The token comes from the Zero Trust dashboard, and the
+    # hostname-to-service mapping (public hostname -> http://web:80) is configured
+    # there too, which is why there is no --url here. See DEMO.md.
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel-named"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   storage:
