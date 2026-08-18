@@ -2,24 +2,20 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * .NET counterpart: none in readlog-dotnet. The nearest .NET idiom would be a
+ * hosted service or an `IDbInitializer` invoked from Program.cs after
+ * Database.Migrate(); Laravel makes seeding a first-class artisan verb instead.
+ */
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->call(DemoLibrarySeeder::class);
     }
 }
