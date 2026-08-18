@@ -138,3 +138,48 @@ jobs:
         # not override variables that already exist in the process environment, so
         # the DB_* values above win and the whole suite runs on the container.
         run: vendor/bin/pest
+
+  compose:
+    # The "fresh clone to running app" claim, checked the way a reader would do it:
+    # a bare checkout with no .env, one command, and the health route answering.
+    # Then the same with the Postgres override, and a look inside to prove the
+    # rows are really in Postgres and not in a stray SQLite file.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start with SQLite (the default)
+        run: docker compose up --build -d --wait --wait-timeout 180
+
+      - name: Health route and home page answer
+        run: |
+          curl -fsS http://127.0.0.1:8080/up > /dev/null
+          curl -fsS http://127.0.0.1:8080/ | grep -q "Recently Read"
+          docker compose exec -T app php artisan tinker --execute='
+            echo DB::connection()->getDriverName(), " books=", App\Models\Book::count(), PHP_EOL;
+            if (DB::connection()->getDriverName() !== "sqlite" || App\Models\Book::count() < 1) exit(1);'
+
+      - name: A second start migrates nothing and seeds nothing
+        run: |
+          docker compose restart app
+          sleep 5
+          docker compose logs --since 60s app | grep -q "already populated"
+
+      - name: Stop
+        run: docker compose down
+
+      - name: Start with the Postgres override
+        run: docker compose -f compose.yaml -f compose.postgres.yaml up -d --wait --wait-timeout 180
+
+      - name: The app is on Postgres and the data is there
+        run: |
+          curl -fsS http://127.0.0.1:8080/up > /dev/null
+          curl -fsS "http://127.0.0.1:8080/library?q=dune" | grep -q "Yes! Found"
+          docker compose -f compose.yaml -f compose.postgres.yaml exec -T app php artisan tinker --execute='
+            if (DB::connection()->getDriverName() !== "pgsql") exit(1);'
+          test "$(docker compose -f compose.yaml -f compose.postgres.yaml exec -T db psql -U readlog -d readlog -tAc "select count(*) from books;")" = "12"
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f compose.yaml -f compose.postgres.yaml down -v
