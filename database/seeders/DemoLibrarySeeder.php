@@ -98,10 +98,12 @@ class DemoLibrarySeeder extends Seeder
         }
 
         foreach (self::ENTRIES as $i => [$bookIndex, $readerIndex, $format, $rating, $daysAgo]) {
+            $finishedOn = self::anchor()->subDays($daysAgo);
+
             $entry = ReadEntry::firstOrNew([
                 'user_id' => $readers[$readerIndex]->id,
                 'book_id' => $books[$bookIndex]->id,
-                'finished_at' => Carbon::today()->subDays($daysAgo)->toDateString(),
+                'finished_at' => $finishedOn->toDateString(),
             ]);
 
             $entry->format = $format;
@@ -110,9 +112,26 @@ class DemoLibrarySeeder extends Seeder
             // The public feed orders by created_at, so stamp it explicitly rather than
             // letting every seeded row share one timestamp. Eloquent only fills
             // created_at when it is not already dirty, so this assignment survives save().
-            $entry->created_at = Carbon::today()->subDays($daysAgo)->addHours(20)->addMinutes($i);
+            $entry->created_at = $finishedOn->addHours(20)->addMinutes($i);
             $entry->save();
         }
+    }
+
+    /**
+     * The date every "days ago" in ENTRIES counts back from.
+     *
+     * Fixed, not today(). The first version used Carbon::today(), which made the
+     * seeder idempotent only within a single calendar day: run it again tomorrow
+     * and every finished_at shifts by one, the firstOrNew lookups miss, and
+     * fourteen new entries appear. That was harmless while the seeder only ever
+     * ran once after migrate:fresh. It stopped being harmless the moment the
+     * seeder was wired to run on every deploy. A fixed anchor makes re-running it
+     * a no-op on any day, at the cost of the demo library slowly looking older,
+     * which is the right trade for demo data.
+     */
+    private static function anchor(): Carbon
+    {
+        return Carbon::create(2026, 8, 18, 0, 0, 0, 'UTC');
     }
 
     private function reader(string $name, string $email): User

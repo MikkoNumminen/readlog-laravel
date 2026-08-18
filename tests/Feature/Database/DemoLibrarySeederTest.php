@@ -56,3 +56,46 @@ it('runs correctly with mass-assignment guards on', function () {
         ->and(Book::count())->toBe(12)
         ->and(ReadEntry::count())->toBe(14);
 });
+
+it('anchors every date to a fixed day, so seeding on a later day is still a no-op', function () {
+    // The first version counted back from today(). Run again tomorrow, every
+    // finished_at shifts by one, the firstOrNew lookups miss, and the library
+    // doubles. Wired to run on every deploy, that would have added fourteen entries
+    // per day. Travelling forward before the second run is what proves the fix.
+    $this->seed(DemoLibrarySeeder::class);
+
+    $this->travel(30)->days();
+    $this->seed(DemoLibrarySeeder::class);
+
+    expect(ReadEntry::count())->toBe(14)
+        ->and(ReadEntry::max('finished_at'))->toBe('2026-08-10');
+});
+
+it('seeds the demo library through DatabaseSeeder only into an empty catalogue', function () {
+    // DatabaseSeeder is what runs on deploy. It must not resurrect demo rows the
+    // author has removed from a live instance, so it seeds once and then stands aside.
+    $this->seed();
+    expect(Book::count())->toBe(12);
+
+    Book::query()->whereIn('title', ['Dune', 'Piranesi'])->each(function (Book $book) {
+        $book->readEntries()->delete();
+        $book->delete();
+    });
+
+    $this->seed();
+
+    expect(Book::count())->toBe(10)
+        ->and(Book::where('title', 'Dune')->exists())->toBeFalse();
+});
+
+it('can still be forced into a populated catalogue by naming the seeder', function () {
+    $this->seed();
+    Book::query()->where('title', 'Dune')->each(function (Book $book) {
+        $book->readEntries()->delete();
+        $book->delete();
+    });
+
+    $this->seed(DemoLibrarySeeder::class);
+
+    expect(Book::count())->toBe(12);
+});
