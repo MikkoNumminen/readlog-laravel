@@ -2,14 +2,21 @@
 
 Where this project stands, what each pull request contains, and what was not done.
 
-Last updated: 2026-08-18.
+Last updated: 2026-08-19.
 
 ## Summary
 
 The migration of [readlog-dotnet](https://github.com/MikkoNumminen/readlog-dotnet)
 to Laravel 13 is **complete for version 1 scope**. Every feature in that scope is
-implemented and tested, the app runs from a clean clone with four commands, and
-the test suite is green.
+implemented and tested, the app runs from a clean clone with one Docker command
+(or four PHP ones), and the test suite is green on SQLite and on Postgres.
+
+**Hosting**: the app runs locally on the author's machine and is put on a public
+URL only on demand, through a Cloudflare quick tunnel, for the length of a demo.
+There is no hosted copy. Cloud deployment was worked on and then dropped as a
+deliberate decision, on cost; the section "Hosting: what is automated and what is
+manual" below has the whole story. The .NET version remains the one hosted
+publicly.
 
 Version 1 scope, from the brief, was four things: books CRUD matching the .NET
 model, the reading-entry log, the search the source has, and the multi-source
@@ -17,8 +24,8 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-196 passing tests, 3 skipped (live API), 503 assertions
-34 PHP files in app/, 13 Blade views, 18 test files
+213 passing tests, 3 skipped (live API), 547 assertions, on SQLite and on Postgres 16
+35 PHP files in app/, 13 Blade views, 20 test files
 ```
 
 ## What each pull request contains
@@ -85,6 +92,85 @@ missing licence, an invented count of service registrations in `Program.cs`, a
 wrong description of what the `composer setup` script runs, and a phrase from my
 own list of things not to write. Every other number in the documents was checked
 against the repository.
+
+### [PR 5: complete the PR 4 entry](https://github.com/MikkoNumminen/readlog-laravel/pull/5)
+
+Merged. 1 commit. The one line STATUS.md could not carry until PR 4 had merged.
+
+### [PR 6: local runtime](https://github.com/MikkoNumminen/readlog-laravel/pull/6)
+
+Merged. 6 commits. Run 2, phase 1.
+
+Two halves. First, the portability work that a cancelled cloud-deployment attempt
+left behind and that was kept on purpose: the reading-log service behaves the
+same on Postgres as on SQLite (case-insensitive lookup by lower-casing both sides
+in SQL; savepoints around the two guarded inserts, because Postgres aborts a
+transaction after a constraint violation), the demo seeder is safe to run on
+every start (fixed date anchor; seeds only into an empty catalogue), and CI runs
+the whole migrate, seed and test cycle against a stock `postgres:16` container
+using only the six documented `DB_*` variables.
+
+Second, Docker Compose: `docker compose up --build -d --wait` from a fresh clone,
+nginx in front of php-fpm, SQLite in a named volume, `APP_KEY` generated on
+first start, and `compose.postgres.yaml` to run the same app on Postgres. A CI
+job brings the stack up from a bare checkout and probes it, on both databases.
+
+Self-review found five things, the notable one being that my own portability fix
+regressed SQLite for non-ASCII titles (`mb_strtolower` in PHP versus SQLite's
+ASCII-only `lower()`); fixed by lower-casing both sides in SQL, with a Finnish
+title as the test.
+
+### [PR 7: on-demand public exposure](https://github.com/MikkoNumminen/readlog-laravel/pull/7)
+
+Merged. 5 commits. Run 2, phase 2.
+
+`config/trustedproxy.php` reading `TRUSTED_PROXIES`, so the app believes the
+forwarded scheme and host from nginx and from a tunnel; `readlog:smoke`, a
+seven-row pass/fail check of a running instance; two compose profiles for a
+Cloudflare quick tunnel and a named tunnel; `scripts/tunnel-up.sh` and
+`tunnel-down.sh`; and DEMO.md. The compose CI job now sends nginx the exact
+headers Cloudflare's edge adds and asserts https links and a Secure cookie.
+
+Self-review found the scripts committed without their executable bit (Git on
+Windows does not record it), a stale `.tunnel-url` that could have been copied
+into the image, and three tests that were wrong when first written.
+
+## Hosting: what is automated and what is manual
+
+**Automated, in the repository:**
+
+- Fresh clone to a running, seeded app: `docker compose up --build -d --wait`.
+- The same on a stock Postgres: `-f compose.yaml -f compose.postgres.yaml`.
+- Correct behaviour behind a proxy or tunnel: `TRUSTED_PROXIES`, https links,
+  Secure session cookie, real client address. Tested, and exercised in CI against
+  the running stack with Cloudflare's headers.
+- Opening and closing a temporary public URL: `scripts/tunnel-up.sh [--smoke]`,
+  `scripts/tunnel-down.sh`.
+- Checking a running instance from outside: `php artisan readlog:smoke --url=...`.
+- CI proving all of the above on every push: SQLite suite, Postgres suite,
+  compose stack on both databases with the proxy check.
+
+**Manual, because it cannot be done from the repository or from CI:**
+
+- Actually opening a Cloudflare tunnel. Neither CI nor the environment this was
+  written in can, so the last step of the chain, Cloudflare itself, has been
+  verified only up to the headers it is documented to send.
+- The one-time walk-through at the end of DEMO.md, five steps: open the tunnel
+  with `--smoke`, load the URL in a private window, switch reader, log a book,
+  close the tunnel and confirm the URL dies. That is the author's remaining
+  work, in that order, and it takes about three minutes.
+
+**What was dropped, and why.** Run 2 began as Laravel Cloud deployment support:
+a Postgres-backed instance on a paid platform with a public URL. The
+database-portability work was done and is what PR 6 opens with. Before anything
+cloud-specific was pushed, the author redirected the run: no cloud provider, no
+recurring cost, no third-party account holding a copy of the app. A
+`MANUAL-STEPS.md` written against Laravel Cloud's dashboard was dropped without
+reaching a PR. What was kept is everything that makes the app runnable anywhere:
+env-driven configuration, SQLite and Postgres both tested, a container that
+starts clean, the health route, and the smoke check. Nothing in the repository
+names a hosting provider. If hosting is ever wanted, TODO.md lists the options
+that exist without recommending one.
 
 ## What was deliberately not done
 
@@ -155,13 +241,15 @@ Psalm would recover most of it and CI already has a place for it next to
 `pint --test`. This is the single largest thing lost in the move and it is in
 TODO.md.
 
-### Deployment, containers and health checks
+### No hosted instance
 
-readlog-dotnet has a Dockerfile, an Azure App Service deployment workflow,
-forwarded-headers handling, HSTS, and persisted data-protection keys. All of it is
-deployment concern for an app that is documented as running locally, and the brief
-rules out anything needing hosting. Laravel ships `/up`, which covers the health
-check.
+readlog-dotnet runs on Azure App Service. This app does not run anywhere but the
+author's machine, and that is a decision, not a gap: see "Hosting" above. What
+readlog-dotnet's Program.cs does for a hosted life (forwarded headers, HSTS,
+persisted data-protection keys, an Azure deploy workflow) is either done here in
+its local form (forwarded headers via `TRUSTED_PROXIES`, a Dockerfile and compose
+stack, `/up`) or has no counterpart because there is no host (HSTS, key
+persistence beyond the storage volume, a deploy pipeline).
 
 ### AI features
 
@@ -190,13 +278,22 @@ Everything below was run on the final state of the branch:
 
 ```
 php artisan migrate:fresh --seed        # clean database, 12 books, 14 entries
-vendor/bin/pest                         # 196 passed, 3 skipped, 503 assertions
+vendor/bin/pest                         # 213 passed, 3 skipped, 547 assertions (SQLite)
+DB_CONNECTION=pgsql ... vendor/bin/pest # 213 passed, 3 skipped (Postgres 16)
 vendor/bin/pint --test                  # passed
 BOOK_SEARCH_LIVE_TESTS=true \
   vendor/bin/pest --filter=LiveProvider # 1 passed, 2 skipped (no Google key)
+docker compose up --build -d --wait     # app=healthy web=healthy, every route 200, /.env 403
+docker compose -f compose.yaml -f compose.postgres.yaml up -d --wait
+                                        # driver pgsql, 12 books counted inside psql
+docker compose exec app php artisan readlog:smoke --url=http://web
+                                        # 6 PASS, 1 WARN (no Google key)
 ```
 
-Plus a manual pass over every route with `php artisan serve`: every page returns
-200 except the intended 404s, the security headers are present, reader switching
-works, and searching the log page against the real Open Library returns hits with
-covers, page counts and years.
+Plus a manual pass over every route with `php artisan serve` and again through
+nginx in compose: every page returns 200 except the intended 404s, the security
+headers are present, reader switching works, and searching the log page against
+the real Open Library returns hits with covers, page counts and years. Sending
+nginx `Host: demo.trycloudflare.com` and `X-Forwarded-Proto: https` produced
+https links and a Secure session cookie. The tunnel itself was not opened; DEMO.md
+lists the checks that remain.

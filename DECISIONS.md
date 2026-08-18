@@ -144,3 +144,13 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 65 | Missing Google Books key is WARN, not FAIL, in the smoke check | The app degrades to Open Library alone by design, and a demo without a key is a valid demo. The exit code stays zero so a script can gate on it; the table still says so. |
 | 66 | Named tunnel documented separately, as a second profile taking a token | The quick tunnel needs no account and is what the brief asks for; a stable hostname needs a free Cloudflare account and a domain, and mixing the two flows would make the quick one look harder than it is. No `--url` on the named service because the hostname-to-service mapping lives in the dashboard. |
 | 67 | Could not open a tunnel from this environment; verified everything up to it | The stack was driven with the exact headers Cloudflare's edge adds (confirmed against Cloudflare's own header reference), producing https links and a Secure cookie, and that check is now in CI. DEMO.md ends with the five manual steps that cover the remaining distance, and says which environment could not run them. |
+
+### Phase 3: documentation close-out
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 68 | No `MANUAL-STEPS.md`; DEMO.md is the procedure | The only remaining manual work is the three-minute tunnel walk-through, and it belongs next to the commands it verifies. A second file would repeat DEMO.md or contradict it. |
+| 69 | README says where the app runs and where the .NET one runs, in one paragraph, no placeholder URL | A placeholder invites someone to fill it, and the decision was that there is nothing to fill. The .NET link is real and stays. |
+| 70 | STATUS.md gets a "Hosting" section separate from "deliberately not done" | It is both a thing done (local runtime, tunnel, smoke check) and a thing not done (a hosted copy), and the automated-versus-manual split is what a reader coming to run it needs first. |
+| 71 | TODO.md lists three hosting options and recommends none, with a question mark | The brief asked for exactly that, and the honest reason is better than a false one: the trade is money against effort against control, and only the author knows which is cheapest for him. |
+| 72 | MIGRATION.md gains three mapping rows rather than a new section | The Dockerfile, the startup migration and the forwarded-headers block all have counterparts in readlog-dotnet now, and the mapping table is where a .NET reader looks for them. The narrative sections describe run 1 and stay as they were. |

@@ -78,22 +78,39 @@ actually conflict.
 
 ## Infrastructure
 
-**Cloudflare Tunnel to show the app in an interview.** `cloudflared tunnel --url
-http://localhost:8000` gives a public HTTPS URL for a locally running app with no
-account and no deployment. Attractive for a demo. Not set up in advance, because a
-quick tunnel's URL changes every time it starts, so there is nothing to prepare
-beyond having `cloudflared` installed. Two things would have to be checked first:
-the `Content-Security-Policy` in `SecurityHeaders.php` uses `form-action 'self'`,
-which is fine through a tunnel, and `APP_URL` would need to match the tunnel host
-or generated links point at localhost. Start it when it is needed, not before.
+**Docker Compose and the Cloudflare Tunnel: done.** Both were listed here as
+questions after run 1 and were built in run 2 (PRs 6 and 7). `docker compose up
+--build -d --wait` runs the app from a fresh clone; `scripts/tunnel-up.sh` puts it
+on a temporary public URL. DEMO.md has the procedure. The one prediction made
+here in run 1 that turned out wrong: it said `APP_URL` would need to match the
+tunnel host. It does not; with a trusted proxy the app uses the request's own
+forwarded scheme and host, and `APP_URL` only matters outside a request.
 
-**Docker Compose instead of `php artisan serve`.** Would remove the "install PHP
-8.3 with these extensions" step and the Windows CA-bundle problem in the README,
-and would pin the runtime so the app behaves the same everywhere. Against it: the
-app is deliberately dependency-free and a single `php artisan serve` is the
-simplest thing that demonstrates it. readlog-dotnet has a Dockerfile because it
-deploys to Azure App Service; this app does not deploy anywhere. Worth doing if
-anyone other than the author needs to run it.
+**Hosting?** Open. The app currently runs on the author's machine and is exposed
+on demand, which is deliberate: zero cost, no third-party account holding a copy,
+and a demo is the only audience it has had. Cloud deployment was started in run 2
+and dropped for that reason (STATUS.md, "Hosting"). The portability work stayed,
+so if a permanent public copy is ever wanted the app is ready for it: env-driven
+configuration, tested on SQLite and on stock Postgres, a container that starts
+clean, `/up`, and `readlog:smoke` to check it once it is up. What is not decided,
+and is not being decided here, is where. The options that exist:
+
+- A free-tier shared PHP host. Zero cost, usually MySQL rather than Postgres
+  (which this app has never been tested on; SQLite on a shared host is
+  workable if the file lives on persistent disk), no Docker, deployment by
+  git or FTP, and terms that vary.
+- A self-installed VPS. A few euros a month, full control, `docker compose up`
+  is the whole deployment, TLS via the named-tunnel option already in
+  `compose.yaml` or via a reverse proxy, and it is the author's to patch and
+  keep running.
+- A paid PaaS (Laravel Cloud, Fly.io, Railway, Render, and the like). Least
+  effort per deploy, a managed Postgres, a real bill every month, and an account
+  and a repo connection to maintain. The Laravel Cloud path was drafted in run 2
+  and would take an afternoon to redo from the current state.
+
+None of these is recommended over the others. The trade is money against effort
+against control, and only the author knows which of those is cheapest for him.
+The question mark stays until there is a reason to remove it.
 
 ## Correctness and tooling
 
