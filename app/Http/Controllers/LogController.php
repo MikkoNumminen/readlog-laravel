@@ -34,17 +34,17 @@ class LogController extends Controller
 
     public function create(Request $request): View
     {
-        $selectedId = $request->query('olid');
+        $selectedId = $this->stringOrNull($request->query('olid'));
 
-        if (is_string($selectedId) && $selectedId !== '') {
+        if ($selectedId !== null) {
             // A book has been chosen: show the log form, prefilled from the query.
             return view('log', [
                 'hasSelection' => true,
                 'selection' => [
                     'open_library_id' => $selectedId,
-                    'title' => (string) $request->query('sel_title', ''),
-                    'author' => $request->query('sel_author'),
-                    'cover_url' => $request->query('cover'),
+                    'title' => $this->stringOrNull($request->query('sel_title')) ?? '',
+                    'author' => $this->stringOrNull($request->query('sel_author')),
+                    'cover_url' => $this->stringOrNull($request->query('cover')),
                     'page_count' => $this->intOrNull($request->query('pages')),
                     'first_publish_year' => $this->intOrNull($request->query('year')),
                     'format' => Format::Book,
@@ -54,8 +54,8 @@ class LogController extends Controller
             ]);
         }
 
-        $title = trim((string) $request->query('title', ''));
-        $author = trim((string) $request->query('author', ''));
+        $title = trim($this->stringOrNull($request->query('title')) ?? '');
+        $author = trim($this->stringOrNull($request->query('author')) ?? '');
         $searchTerm = trim($title.' '.$author);
 
         return view('log', [
@@ -88,5 +88,15 @@ class LogController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
+    }
+
+    /**
+     * Query-string values are attacker-controlled in both shape and type: ?title[]=x
+     * arrives as an array, and casting that to string is a warning plus the literal
+     * word "Array". Anything that is not a non-empty string is treated as absent.
+     */
+    private function stringOrNull(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

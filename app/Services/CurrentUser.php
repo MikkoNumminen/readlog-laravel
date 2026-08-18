@@ -31,6 +31,17 @@ class CurrentUser
     /**
      * The acting user, or null when the database has no users at all
      * (a migrated but unseeded install).
+     *
+     * Deliberately not memoised, and the class is deliberately not bound as a
+     * singleton or as scoped. Both were tried, to save the three or four lookups a
+     * request makes (middleware, controller, view composer), and both are wrong for
+     * the same reason: this object holds a Session, and a container binding that
+     * outlives one request hands the next request the previous request's session.
+     * Under `php artisan serve` the process is torn down between requests so the
+     * bug is invisible, but the test suite handles many requests in one process and
+     * caught it immediately, with one reader's library showing up for another.
+     *
+     * The lookups it saves are single indexed primary-key reads. Not worth it.
      */
     public function get(): ?User
     {

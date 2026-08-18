@@ -22,13 +22,16 @@ class BookController extends Controller
 {
     public function show(Request $request): View
     {
-        $title = trim((string) $request->query('title', ''));
+        $titleParam = $request->query('title');
+        $title = is_string($titleParam) ? trim($titleParam) : '';
 
         abort_if($title === '', 404);
 
+        $cover = $request->query('cover');
+
         return view('book', [
             'title' => $title,
-            'fallbackCoverUrl' => $request->query('cover'),
+            'fallbackCoverUrl' => is_string($cover) ? $cover : null,
             'details' => null,
             'safeDescriptionHtml' => null,
             'safeInfoLink' => null,
