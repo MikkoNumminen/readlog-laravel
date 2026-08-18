@@ -65,7 +65,10 @@ class OpenLibraryClient
             throw new RuntimeException("Open Library API error ({$response->status()}).");
         }
 
+        // Same rule as the Google client: a malformed element is skipped, not
+        // allowed to sink the whole response.
         return collect($response->json('docs') ?? [])
+            ->filter(fn ($doc) => is_array($doc))
             ->map(fn (array $doc) => $this->map($doc))
             ->values();
     }
@@ -81,8 +84,12 @@ class OpenLibraryClient
             openLibraryId: $doc['key'] ?? '',
             title: $doc['title'] ?? '',
             subtitle: $doc['subtitle'] ?? null,
-            // First author only, as in the source.
-            author: $doc['author_name'][0] ?? null,
+            // First author only, as in the source. author_name is documented as a
+            // list; if it ever arrives as a bare string, PHP's string offset would
+            // silently hand back its first character, so the shape is checked.
+            author: is_array($doc['author_name'] ?? null)
+                ? (is_string($doc['author_name'][0] ?? null) ? $doc['author_name'][0] : null)
+                : (is_string($doc['author_name'] ?? null) ? $doc['author_name'] : null),
             firstPublishYear: isset($doc['first_publish_year']) ? (int) $doc['first_publish_year'] : null,
             pageCount: isset($doc['number_of_pages_median']) ? (int) $doc['number_of_pages_median'] : null,
             coverUrl: $coverId === null ? null : "https://covers.openlibrary.org/b/id/{$coverId}-M.jpg",

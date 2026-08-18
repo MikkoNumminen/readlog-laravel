@@ -85,8 +85,9 @@ To run the same app on a stock Postgres 16 instead of SQLite, add the override:
 docker compose -f compose.yaml -f compose.postgres.yaml up --build -d --wait
 ```
 
-`APP_PORT` (default `8080`) and `GOOGLE_BOOKS_API_KEY` are read from the shell or
-from a `.env` file next to `compose.yaml`.
+`APP_PORT` (default `8080`), `APP_BIND` (default `127.0.0.1`, so nothing on the
+LAN reaches it unless you say `0.0.0.0`) and `GOOGLE_BOOKS_API_KEY` are read from
+the shell or from a `.env` file next to `compose.yaml`.
 
 To put the running app on a temporary public URL, `scripts/tunnel-up.sh` (and
 `scripts/tunnel-down.sh` to close it). See [DEMO.md](DEMO.md).

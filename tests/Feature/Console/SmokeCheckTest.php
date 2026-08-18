@@ -111,3 +111,13 @@ it('does not print a Google API key that appears in an error message', function 
         ->expectsOutputToContain('key=REDACTED')
         ->assertExitCode(1);
 });
+
+it('prints an exception message of "0" rather than replacing it with the class name', function () {
+    // strtok(...) ?: fallback treated the string "0" as empty.
+    Http::fake(fn () => throw new ConnectionException('0'));
+    ReadEntry::factory()->for(User::factory())->create();
+
+    $this->artisan('readlog:smoke')
+        ->expectsOutputToContain('failed: 0')
+        ->assertExitCode(1);
+});

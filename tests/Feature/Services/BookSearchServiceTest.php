@@ -473,3 +473,66 @@ it('still says enough in the log to diagnose the failure', function () {
             && str_contains($context['reason'], '504')
     );
 });
+
+// --- Malformed provider shapes ---------------------------------------------
+
+it('skips a malformed Google item instead of dropping the whole Google response', function () {
+    // Review finding: a single non-array element used to raise a TypeError inside
+    // the map, which settle() caught at the whole-response level, discarding every
+    // good hit alongside the bad one.
+    Http::fake([
+        OPEN_LIBRARY_URL => Http::response(openLibraryDocs([])),
+        GOOGLE_BOOKS_URL => Http::response(['items' => [
+            gVolume('g1', ['title' => 'Good One']),
+            null,
+            'not an object',
+            gVolume('g2', ['title' => 'Good Two']),
+        ]]),
+    ]);
+
+    expect(searchService()->search('x')->pluck('title')->all())->toBe(['Good One', 'Good Two']);
+});
+
+it('skips a malformed Open Library doc the same way', function () {
+    Http::fake([
+        OPEN_LIBRARY_URL => Http::response(['docs' => [olDoc('/works/OL1W', 'Good'), 42, olDoc('/works/OL2W', 'Also Good')]]),
+        GOOGLE_BOOKS_URL => Http::response(googleVolumes([])),
+    ]);
+
+    expect(searchService()->search('x'))->toHaveCount(2);
+});
+
+it('takes a bare-string author_name from Open Library whole, not its first character', function () {
+    // PHP's string offset access would silently turn "J.R.R. Tolkien"[0] into "J".
+    Http::fake([
+        OPEN_LIBRARY_URL => Http::response(openLibraryDocs([olDoc('/works/OL1W', 'The Hobbit', ['author_name' => 'J.R.R. Tolkien'])])),
+        GOOGLE_BOOKS_URL => Http::response(googleVolumes([])),
+    ]);
+
+    expect(searchService()->search('hobbit')->sole()->author)->toBe('J.R.R. Tolkien');
+});
+
+it('takes a bare-string authors field from Google the same way', function () {
+    Http::fake([
+        OPEN_LIBRARY_URL => Http::response(openLibraryDocs([])),
+        GOOGLE_BOOKS_URL => Http::response(googleVolumes([gVolume('g1', ['title' => 'Dune', 'authors' => 'Frank Herbert'])])),
+    ]);
+
+    expect(searchService()->search('dune')->sole()->author)->toBe('Frank Herbert');
+});
+
+it('upgrades only the leading scheme of a cover url to https', function () {
+    // The .NET port's Replace("http:", "https:") rewrote every occurrence, which
+    // would corrupt an embedded URL in a query string. The JavaScript original's
+    // String.replace touched the first occurrence only. This follows the original.
+    Http::fake([
+        OPEN_LIBRARY_URL => Http::response(openLibraryDocs([])),
+        GOOGLE_BOOKS_URL => Http::response(googleVolumes([gVolume('g1', [
+            'title' => 'T',
+            'imageLinks' => ['thumbnail' => 'http://books.google.com/c.jpg?next=http://example.com/x'],
+        ])])),
+    ]);
+
+    expect(searchService()->search('t')->sole()->coverUrl)
+        ->toBe('https://books.google.com/c.jpg?next=http://example.com/x');
+});

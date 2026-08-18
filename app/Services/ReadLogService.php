@@ -140,8 +140,8 @@ class ReadLogService
         return $this->entryQuery()
             ->where('user_id', $userId)
             ->whereHas('book', fn (Builder $books) => $books->whereRaw(
-                'lower(title) like lower(?) escape '.self::LIKE_ESCAPE_LITERAL,
-                [$pattern]
+                'lower(title) like lower(?) escape ?',
+                [$pattern, self::LIKE_ESCAPE]
             ))
             ->orderByDesc('finished_at')
             ->get()
@@ -329,23 +329,28 @@ class ReadLogService
     }
 
     /**
+     * The LIKE escape character, bound as a parameter alongside the pattern.
+     *
+     * An earlier version spliced it into the SQL as the literal '\' with a comment
+     * claiming SQLite would not accept ESCAPE as a parameter. That claim was wrong:
+     * both SQLite and Postgres take a bound value there, checked directly through
+     * PDO on each. Binding it removes the one place this query depended on how the
+     * server parses a backslash inside a string literal (Postgres with
+     * standard_conforming_strings off would have read '\' as an escaped quote).
+     */
+    private const LIKE_ESCAPE = '\\';
+
+    /**
      * Escapes LIKE metacharacters so a search term is matched literally.
      *
-     * .NET counterpart: ReadLogService.EscapeLike. Same three replacements, but the
-     * escape character has to be declared to SQLite as well (see LIKE_ESCAPE_LITERAL);
-     * EF Core's EF.Functions.Like takes it as a third argument.
+     * .NET counterpart: ReadLogService.EscapeLike. Same three replacements;
+     * EF.Functions.Like takes the escape character as a third argument, which is
+     * what the bound parameter above is.
      */
     private function escapeLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
-
-    /**
-     * The SQL literal for the LIKE escape character: a single-quoted single backslash.
-     * Built here rather than inlined so the layers of escaping stay readable, and kept
-     * out of the bindings because SQLite wants ESCAPE as a literal, not a parameter.
-     */
-    private const LIKE_ESCAPE_LITERAL = "'\\'";
 
     private function forgetPublicFeed(): void
     {

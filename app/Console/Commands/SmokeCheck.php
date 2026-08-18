@@ -196,6 +196,10 @@ class SmokeCheck extends Command
     {
         $message = preg_replace('/([?&]key=)[^&\s]+/i', '$1REDACTED', $e->getMessage()) ?? $e->getMessage();
 
-        return trim(strtok($message, "\n") ?: get_class($e));
+        // strtok() returns false on an empty message, and PHP would also treat a
+        // message of exactly "0" as empty under ?:, so the check is explicit.
+        $firstLine = trim((string) strtok($message, "\n"));
+
+        return $firstLine !== '' ? $firstLine : get_class($e);
     }
 }
