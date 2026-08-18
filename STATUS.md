@@ -75,7 +75,16 @@ carry the URI, so there was nothing in the source to warn against it.
 
 ### [PR 4: documentation](https://github.com/MikkoNumminen/readlog-laravel/pull/4)
 
-MIGRATION.md, README.md, TODO.md and this file.
+Merged. 5 commits.
+
+MIGRATION.md, README.md, TODO.md and this file. No code changes, plus one licence
+file that the README had been claiming for three phases without it existing.
+
+Self-review found four inaccuracies in my own prose rather than any bug: the
+missing licence, an invented count of service registrations in `Program.cs`, a
+wrong description of what the `composer setup` script runs, and a phrase from my
+own list of things not to write. Every other number in the documents was checked
+against the repository.
 
 ## What was deliberately not done
 
