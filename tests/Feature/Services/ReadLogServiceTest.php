@@ -354,3 +354,17 @@ it('exposes no user fields at all on the public feed projection', function () {
     expect($properties)->toBe(['title', 'author', 'coverUrl', 'format', 'createdAt', 'rating'])
         ->and(json_encode($read))->not->toContain('Very Private Person');
 });
+
+it('matches a non-ASCII title typed exactly as written, on every database', function () {
+    // Guards the portability fix for the lookup. Lower-casing the query in PHP with
+    // mb_strtolower() while SQLite's lower() is ASCII-only turned "Ääni" LIKE
+    // "%ääni%" into a miss on SQLite. Both sides are now lower-cased by the same
+    // database function, so an exact-case match must hold on SQLite and Postgres
+    // alike. (Case-insensitive matching of non-ASCII letters is Postgres-only and
+    // deliberately not asserted here.)
+    $user = User::factory()->create();
+    service()->logBook($user->id, logData('ol:fi', 'Ääni ja vimma', '2024-01-01'));
+
+    expect(service()->checkIfRead($user->id, 'Ääni'))->toHaveCount(1)
+        ->and(service()->checkIfRead($user->id, 'VIMMA'))->toHaveCount(1); // ASCII case still folds everywhere
+});

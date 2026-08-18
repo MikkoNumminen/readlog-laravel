@@ -123,18 +123,24 @@ class ReadLogService
         // relies on SQLite's LIKE being ASCII case-insensitive by default. That
         // assumption does not survive a change of database: Postgres LIKE is
         // case-sensitive, and the case-insensitive ILIKE is Postgres-only. Lower-
-        // casing both sides is plain SQL that behaves the same everywhere. On
-        // SQLite, lower() is ASCII-only, exactly like its LIKE, so nothing changes
-        // there; on Postgres it is Unicode-aware, which is a small improvement.
+        // casing both sides is plain SQL that behaves the same everywhere.
+        //
+        // Both sides are lower-cased by the database, not one side by PHP. The
+        // first version ran mb_strtolower() on the query, which is Unicode-aware,
+        // while SQLite's lower() is ASCII-only: a title "Ääni" and a query "Ääni"
+        // became "Ääni" LIKE "%ääni%" and stopped matching on SQLite. Letting the
+        // same lower() see both strings keeps each database consistent with itself:
+        // SQLite stays ASCII-insensitive and exact for anything else, precisely as
+        // its LIKE was, and Postgres is Unicode-aware on both sides.
         //
         // The user's own % / _ / backslash are escaped so they match literally,
-        // not as wildcards.
-        $pattern = '%'.$this->escapeLike(mb_strtolower(trim($query))).'%';
+        // not as wildcards. Lower-casing does not touch those three characters.
+        $pattern = '%'.$this->escapeLike(trim($query)).'%';
 
         return $this->entryQuery()
             ->where('user_id', $userId)
             ->whereHas('book', fn (Builder $books) => $books->whereRaw(
-                'lower(title) like ? escape '.self::LIKE_ESCAPE_LITERAL,
+                'lower(title) like lower(?) escape '.self::LIKE_ESCAPE_LITERAL,
                 [$pattern]
             ))
             ->orderByDesc('finished_at')
