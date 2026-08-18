@@ -81,3 +81,13 @@ read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 | --- | --- | --- |
 | 38 | The Google API key is redacted before anything is logged | Guzzle puts the full request URL in a connection-failure message, and Google Books only accepts its key in the query string, so a DNS blip wrote the credential into `storage/logs`. .NET's `HttpRequestException` does not carry the URI, so there was nothing in the source to port and nothing to warn me. |
 | 39 | `Http::preventStrayRequests()` in the test bootstrap | Wiring search into the log page silently turned the phase 2 page tests into live network calls. They still passed. The only signal was the suite going from 2.8 seconds to 13. |
+
+## Phase 4: documentation
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 40 | MIGRATION.md names nine specific failures from this run, with how each was caught | The brief asks for an honest account of where AI assistance produced wrong output. A list of categories would have been safer to write and worth nothing to read. |
+| 41 | Kept the mapping tables organised by layer rather than alphabetically | A reader coming from readlog-dotnet is looking for "where did my page model go", not for a lookup table. Grouping by tooling, domain, services, HTTP and views follows how you would actually go looking. |
+| 42 | STATUS.md leads with what was not done | Everything that was done is visible in the code and the pull requests. What is missing, and why, is the part nobody can reconstruct. |
+| 43 | Added the MIT licence, copied from readlog-dotnet | The README claimed MIT before the file existed. Caught in the phase 4 self-review. |
+| 44 | Documented the Windows CA-bundle problem in the README | Found by running the live provider tests. A bare PHP install on Windows cannot reach either provider, and because the search tolerates an unreachable provider the only symptom is "No books found." for every query. Nothing in the app suggests a configuration problem. |
