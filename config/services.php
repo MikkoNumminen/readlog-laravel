@@ -35,4 +35,43 @@ return [
         ],
     ],
 
+    /*
+    | The two book providers.
+    |
+    | .NET counterpart: the "GoogleBooks" section bound to Options/GoogleBooksOptions.cs
+    | through IOptions, plus the base addresses and timeouts set on the typed
+    | HttpClients in Program.cs. Laravel has no IOptions equivalent worth building
+    | here: config() is already a typed-enough, injectable, cached lookup, and one
+    | class per config section would be ceremony without a payoff.
+    |
+    | Open Library needs no credentials. Google Books needs an API key, and when it
+    | is absent that provider is skipped entirely rather than failing: search falls
+    | back to Open Library only, and the book detail page shows "no details", which
+    | is exactly what readlog-dotnet does.
+    */
+    'open_library' => [
+        'base_url' => env('OPEN_LIBRARY_BASE_URL', 'https://openlibrary.org/'),
+    ],
+
+    'google_books' => [
+        'api_key' => env('GOOGLE_BOOKS_API_KEY'),
+        'base_url' => env('GOOGLE_BOOKS_BASE_URL', 'https://www.googleapis.com/books/v1/'),
+    ],
+
+    'book_search' => [
+        // Seconds before a provider request is abandoned. Matches the 10 second
+        // HttpClient.Timeout the .NET app sets on both typed clients.
+        'timeout' => (int) env('BOOK_SEARCH_TIMEOUT', 10),
+
+        // How many hits to ask each provider for. Kept equal across providers so the
+        // Open-Library-first merge stays balanced.
+        'limit' => (int) env('BOOK_SEARCH_LIMIT', 15),
+
+        // Off by default: the test suite fakes every outbound request. Turning this
+        // on lets the handful of tests tagged "live" actually call openlibrary.org
+        // and googleapis.com, which is how the faked response shapes get checked
+        // against reality now and then.
+        'live_tests' => filter_var(env('BOOK_SEARCH_LIVE_TESTS', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
 ];
