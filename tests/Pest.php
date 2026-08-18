@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Services\CurrentUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -23,6 +24,22 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // No test reaches the network unless it says so.
+        //
+        // This is not belt and braces. The moment BookSearchService was wired into
+        // the log page, the phase 2 page tests started calling openlibrary.org for
+        // real: they still passed, and the suite went from 2.8 to 13 seconds, which
+        // is the only reason anyone noticed. preventStrayRequests turns an unfaked
+        // outbound request into a failure naming the URL.
+        //
+        // .NET counterpart: the source injects a StubHttpMessageHandler per test, so
+        // a client with no stub simply has nowhere to send anything. Laravel's Http
+        // facade is global, so the equivalent guarantee has to be switched on.
+        if (! config('services.book_search.live_tests')) {
+            Http::preventStrayRequests();
+        }
+    })
     ->in('Feature');
 
 pest()->extend(TestCase::class)->in('Unit');

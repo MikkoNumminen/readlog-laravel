@@ -61,3 +61,23 @@ read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 | --- | --- | --- |
 | 28 | `CurrentUser` is not memoised and not bound as a singleton or scoped | Tried, to save three or four reader lookups per request. It holds a `Session`, so any binding outliving a request hands the next request the previous session. `artisan serve` tears the process down between requests and hides it; the test suite runs many requests in one process and failed immediately, showing one reader's library to another. |
 | 29 | Query-string values are checked with `is_string`, not cast | `?title[]=x` arrives as an array. Casting that to string is a warning and the literal word "Array". C#'s model binding rejects the shape mismatch for you; PHP hands you whatever arrived. |
+
+## Phase 3: the multi-source lookup
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 30 | `Http::pool()` for the fan-out, not two sequential calls | The brief calls this the most interesting logic in the app, and doing it sequentially would drop the one property that makes it interesting. A pool hands both requests to curl_multi and blocks until both return, so the wall-clock behaviour matches `Task.WhenAll`. |
+| 31 | Clients split into `requestSearch()` and `parseSearch()` | A pool needs every request handed over before any response exists, so a single method that fetches and maps cannot be pooled. This split is the visible cost of PHP not having `await`, and it is the only structural change the port forced on the client classes. |
+| 32 | No `CancellationToken` counterpart | Every .NET method here takes one, and the source is careful to let a caller-initiated cancel propagate rather than degrade to empty results. A PHP request has nothing to cancel from, so the parameter has no meaning and was dropped rather than faked. |
+| 33 | Kept the provider-failure asymmetry | Open Library throws on a non-success response, Google Books returns empty. It looks like an inconsistency worth tidying. It is inherited from the original Next.js app through the .NET port, and the brief says port like for like. |
+| 34 | Config in `config/services.php`, no `IOptions` equivalent | `Options/GoogleBooksOptions.cs` exists because .NET binds configuration to a type. `config()` is already a cached, injectable lookup, so a class per section would be ceremony without a payoff. |
+| 35 | `symfony/html-sanitizer` for the description HTML | The .NET version uses Ganss.Xss. Symfony's component is the closest PHP equivalent: allowlist-based, actively maintained, MIT, and nothing to sign up for. |
+| 36 | `defaultAction(Block)` on the sanitizer | Ganss.Xss keeps the text of a disallowed tag; Symfony's default is to drop the element and everything inside it. Without this line, a description wrapped in an unknown tag silently became an empty string. Explicit `dropElement` calls are what keep that safe for `script` and `style`. |
+| 37 | Live provider tests behind `BOOK_SEARCH_LIVE_TESTS` | Faked responses prove the code does what it is told and nothing about whether the fakes still resemble what the providers send. Three tests assert response shape against the real APIs, off by default so CI never leaves the machine. |
+
+### Added during the phase 3 self-review
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 38 | The Google API key is redacted before anything is logged | Guzzle puts the full request URL in a connection-failure message, and Google Books only accepts its key in the query string, so a DNS blip wrote the credential into `storage/logs`. .NET's `HttpRequestException` does not carry the URI, so there was nothing in the source to port and nothing to warn me. |
+| 39 | `Http::preventStrayRequests()` in the test bootstrap | Wiring search into the log page silently turned the phase 2 page tests into live network calls. They still passed. The only signal was the suite going from 2.8 seconds to 13. |
