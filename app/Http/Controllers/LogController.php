@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\Format;
 use App\Exceptions\DuplicateReadEntryException;
 use App\Http\Requests\LogBookRequest;
+use App\Services\BookSearchService;
 use App\Services\CurrentUser;
 use App\Services\ReadLogService;
 use Illuminate\Http\RedirectResponse;
@@ -20,16 +21,13 @@ use Illuminate\View\View;
  * both stages of the flow off one URL by looking at whether `olid` is present, and
  * that is kept, because the "change book" link and the browser back button both
  * depend on the two stages being addressable.
- *
- * Provider search (Open Library plus Google Books) arrives in phase 3. Until then
- * `$results` is always empty, which puts the page in the same state the .NET app
- * is in when no provider returns anything: the manual-add fallback.
  */
 class LogController extends Controller
 {
     public function __construct(
         private readonly ReadLogService $readLog,
         private readonly CurrentUser $currentUser,
+        private readonly BookSearchService $search,
     ) {}
 
     public function create(Request $request): View
@@ -63,7 +61,7 @@ class LogController extends Controller
             'title' => $title,
             'author' => $author,
             'searched' => $searchTerm !== '',
-            'results' => collect(),
+            'results' => $searchTerm === '' ? collect() : $this->search->search($searchTerm),
 
             // A manual-add fallback is offered after every search, not only after an
             // empty one: the providers return irrelevant-but-nonzero hits for niche
