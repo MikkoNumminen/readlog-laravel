@@ -31,3 +31,6 @@ Thumbs.db
 /database/*.sqlite-journal
 /database/*.sqlite-wal
 /database/*.sqlite-shm
+
+# Written by scripts/tunnel-up.sh; the current public URL, if any
+.tunnel-url
