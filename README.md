@@ -38,16 +38,41 @@ tests plus 3 live-API tests that are skipped by default. **There is no
 authentication**, deliberately, and the app ships a demo reader switcher in its
 place; see STATUS.md for that and for the other known gaps.
 
-## Requirements
+## Running it
+
+Two ways. Both end with two readers, twelve real books and fourteen reading
+entries already in the library, so every page has something on it immediately.
+
+### With Docker, one command
+
+Needs only Docker (Docker Desktop on Windows or macOS, or the engine plus the
+compose plugin on Linux). No PHP on the host, no `.env` file, nothing to paste.
+
+```bash
+git clone https://github.com/MikkoNumminen/readlog-laravel.git
+cd readlog-laravel
+docker compose up --build -d --wait
+```
+
+Then open <http://localhost:8080>. The first start generates an application key,
+migrates, seeds and caches; every later start finds that already done. The
+database is SQLite in a Docker volume, so it survives `docker compose down`.
+`docker compose down -v` throws it away.
+
+To run the same app on a stock Postgres 16 instead of SQLite, add the override:
+
+```bash
+docker compose -f compose.yaml -f compose.postgres.yaml up --build -d --wait
+```
+
+`APP_PORT` (default `8080`) and `GOOGLE_BOOKS_API_KEY` are read from the shell or
+from a `.env` file next to `compose.yaml`.
+
+### With PHP on the host
 
 - PHP 8.3 or newer, with `pdo_sqlite`, `sqlite3`, `mbstring`, `curl`, `fileinfo`,
   `dom`, `xml` and `zip`
 - [Composer](https://getcomposer.org/)
-
-Nothing else. No Node, no build step, no database server, no paid service, no
-account to create anywhere.
-
-## Running it
 
 ```bash
 composer install
@@ -57,10 +82,8 @@ php artisan migrate --seed
 php artisan serve
 ```
 
-Then open <http://localhost:8000>. The seed data is two readers, twelve real books
-and fourteen reading entries, so every page has something on it immediately.
-
-`composer setup` runs everything except the last line.
+Then open <http://localhost:8000>. `composer setup` runs everything except the
+last line.
 
 ## Running the tests
 

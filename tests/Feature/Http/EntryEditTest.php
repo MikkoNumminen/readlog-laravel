@@ -121,11 +121,19 @@ it('rejects an edit that would collide with another entry on the same date', fun
     ReadEntry::factory()->for($user)->for($book)->create(['finished_at' => '2024-01-01']);
     $second = ReadEntry::factory()->for($user)->for($book)->create(['finished_at' => '2024-02-01']);
 
-    expect(fn () => actingAsReader($user)->withoutExceptionHandling()->put("/library/{$second->id}", [
-        'format' => Format::Book->value,
-        'finished_at' => '2024-01-01',
-        'rating' => null,
-    ]))->toThrow(UniqueConstraintViolationException::class);
+    // The request runs inside a savepoint. In production every request is its own
+    // transaction scope, so a failed UPDATE leaves the connection usable. Under
+    // RefreshDatabase the whole test is one transaction, and on Postgres a failed
+    // statement aborts that transaction, so the ->fresh() below would fail with
+    // "current transaction is aborted" instead of proving the row is untouched.
+    // Rolling back to a savepoint reproduces the production boundary.
+    expect(fn () => DB::transaction(fn () => actingAsReader($user)
+        ->withoutExceptionHandling()
+        ->put("/library/{$second->id}", [
+            'format' => Format::Book->value,
+            'finished_at' => '2024-01-01',
+            'rating' => null,
+        ])))->toThrow(UniqueConstraintViolationException::class);
 
     expect($second->fresh()->finished_at->toDateString())->toBe('2024-02-01');
 });

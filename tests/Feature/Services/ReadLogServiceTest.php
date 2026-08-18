@@ -307,12 +307,25 @@ it('allows two users to log the same book on the same date', function () {
 it('recovers when it loses the race to create a shared catalogue book', function () {
     // The .NET suite proves this with two real connections logging concurrently
     // (LogBookAsync_handles_a_concurrent_first_log_of_the_same_book). PHP has no
-    // threads to do that with, so the race is forced instead: a model event drops
-    // the winning row in between the existence check and the insert, which is
+    // threads to do that with, so the race is forced instead: the winning row is
+    // dropped in between the service's existence check and its insert, which is
     // exactly the window the recovery code exists for.
+    //
+    // The hook is a query listener that fires once, right after the SELECT that
+    // finds nothing. An earlier version used a Book::creating model event, which
+    // fires inside create() and therefore inside the savepoint the service now
+    // opens around the insert, so the simulated winner was rolled back together
+    // with the loser and the recovery had nothing to find. A concurrent writer's
+    // row would already be committed, and this arranges the same thing.
     $user = User::factory()->create();
 
-    Book::creating(function () {
+    $planted = false;
+    DB::listen(function ($query) use (&$planted) {
+        if ($planted || ! str_contains($query->sql, 'from "books"')) {
+            return;
+        }
+
+        $planted = true;
         DB::table('books')->insert([
             'title' => 'Winner',
             'open_library_id' => 'ol:race',
@@ -340,4 +353,18 @@ it('exposes no user fields at all on the public feed projection', function () {
 
     expect($properties)->toBe(['title', 'author', 'coverUrl', 'format', 'createdAt', 'rating'])
         ->and(json_encode($read))->not->toContain('Very Private Person');
+});
+
+it('matches a non-ASCII title typed exactly as written, on every database', function () {
+    // Guards the portability fix for the lookup. Lower-casing the query in PHP with
+    // mb_strtolower() while SQLite's lower() is ASCII-only turned "Ääni" LIKE
+    // "%ääni%" into a miss on SQLite. Both sides are now lower-cased by the same
+    // database function, so an exact-case match must hold on SQLite and Postgres
+    // alike. (Case-insensitive matching of non-ASCII letters is Postgres-only and
+    // deliberately not asserted here.)
+    $user = User::factory()->create();
+    service()->logBook($user->id, logData('ol:fi', 'Ääni ja vimma', '2024-01-01'));
+
+    expect(service()->checkIfRead($user->id, 'Ääni'))->toHaveCount(1)
+        ->and(service()->checkIfRead($user->id, 'VIMMA'))->toHaveCount(1); // ASCII case still folds everywhere
 });

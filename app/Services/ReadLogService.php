@@ -53,13 +53,15 @@ class ReadLogService
         $book = $this->getOrCreateBook($data);
 
         try {
-            ReadEntry::create([
+            // Wrapped in a savepoint when a transaction is already open (see
+            // getOrCreateBook for why); a no-op at transaction level zero.
+            ReadEntry::query()->withSavepointIfNeeded(fn () => ReadEntry::create([
                 'user_id' => $userId,
                 'book_id' => $book->id,
                 'format' => $data->format,
                 'finished_at' => $data->finishedAt,
                 'rating' => $data->rating,
-            ]);
+            ]));
         } catch (UniqueConstraintViolationException $e) {
             // The unique (user, book, finished-on) index may have rejected a duplicate.
             // Confirm by re-querying; if it really is a duplicate, surface a domain
@@ -117,15 +119,28 @@ class ReadLogService
             return collect();
         }
 
-        // Case-insensitive "contains": SQLite's LIKE is ASCII case-insensitive by
-        // default, the same assumption the .NET version makes. The user's own
-        // % / _ / backslash are escaped so they match literally, not as wildcards.
+        // Case-insensitive "contains". The .NET version writes a plain LIKE and
+        // relies on SQLite's LIKE being ASCII case-insensitive by default. That
+        // assumption does not survive a change of database: Postgres LIKE is
+        // case-sensitive, and the case-insensitive ILIKE is Postgres-only. Lower-
+        // casing both sides is plain SQL that behaves the same everywhere.
+        //
+        // Both sides are lower-cased by the database, not one side by PHP. The
+        // first version ran mb_strtolower() on the query, which is Unicode-aware,
+        // while SQLite's lower() is ASCII-only: a title "Ääni" and a query "Ääni"
+        // became "Ääni" LIKE "%ääni%" and stopped matching on SQLite. Letting the
+        // same lower() see both strings keeps each database consistent with itself:
+        // SQLite stays ASCII-insensitive and exact for anything else, precisely as
+        // its LIKE was, and Postgres is Unicode-aware on both sides.
+        //
+        // The user's own % / _ / backslash are escaped so they match literally,
+        // not as wildcards. Lower-casing does not touch those three characters.
         $pattern = '%'.$this->escapeLike(trim($query)).'%';
 
         return $this->entryQuery()
             ->where('user_id', $userId)
             ->whereHas('book', fn (Builder $books) => $books->whereRaw(
-                'title like ? escape '.self::LIKE_ESCAPE_LITERAL,
+                'lower(title) like lower(?) escape '.self::LIKE_ESCAPE_LITERAL,
                 [$pattern]
             ))
             ->orderByDesc('finished_at')
@@ -255,14 +270,23 @@ class ReadLogService
         }
 
         try {
-            return Book::create([
+            // The insert runs inside a savepoint whenever a transaction is already
+            // open, and bare otherwise. This is what Laravel's own createOrFirst does,
+            // and it exists for Postgres: after a constraint violation Postgres marks
+            // the whole transaction as aborted, so the "look for the winner" query in
+            // the catch block would itself fail with "current transaction is aborted".
+            // Rolling back to a savepoint keeps the transaction usable. SQLite does
+            // not need it, which is why the first version of this code, tested on
+            // SQLite only, never noticed. In production there is no outer transaction
+            // and the closure runs as-is.
+            return Book::query()->withSavepointIfNeeded(fn () => Book::create([
                 'open_library_id' => $data->openLibraryId,
                 'title' => $data->title,
                 'author' => $data->author,
                 'cover_url' => $data->coverUrl,
                 'page_count' => $data->pageCount,
                 'first_publish_year' => $data->firstPublishYear,
-            ]);
+            ]));
         } catch (UniqueConstraintViolationException $e) {
             // We may have lost a race to create the shared book. Look for the winner.
             $winner = Book::query()->where('open_library_id', $data->openLibraryId)->first();

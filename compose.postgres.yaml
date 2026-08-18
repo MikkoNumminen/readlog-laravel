@@ -1,0 +1,47 @@
+# Opt-in Postgres. Layer this over compose.yaml to run the app against a stock
+# Postgres 16 instead of SQLite:
+#
+#     docker compose -f compose.yaml -f compose.postgres.yaml up --build
+#
+# It exists to exercise the portability work locally: the same six DB_* variables
+# CI uses, pointed at a container instead of a service. Nothing about the app
+# changes; only the connection does. Data lives in its own volume, separate from
+# the SQLite file, so switching between the two files does not mix them up.
+#
+# The database is not published on a host port. It is reachable from the app
+# container as `db` and from nowhere else; use `docker compose exec db psql -U
+# readlog` to look inside.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: readlog
+      POSTGRES_USER: readlog
+      POSTGRES_PASSWORD: readlog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U readlog -d readlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: readlog
+      DB_USERNAME: readlog
+      DB_PASSWORD: readlog
+      # A container on the compose network has no TLS; managed providers do and
+      # want "require". This is the whole reason it is a variable.
+      DB_SSLMODE: disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

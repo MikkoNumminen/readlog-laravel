@@ -3,6 +3,13 @@
 # instead of dotnet restore, Pest instead of `dotnet test`, and an explicit
 # `migrate` step because Laravel has no compile stage that would catch a broken
 # migration.
+#
+# Two jobs. `sqlite` is the developer's loop, exactly what `vendor/bin/pest` does
+# on a laptop. `postgres` is the production claim: the whole migrate, seed and
+# test cycle against a stock postgres:16 service container, configured through
+# nothing but the six DB_* variables documented in .env.example. If that job is
+# green, the app comes up on any standard Postgres, not on one provider's flavour
+# of it.
 name: CI
 
 on:
@@ -11,7 +18,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  sqlite:
     runs-on: ubuntu-latest
 
     steps:
@@ -49,3 +56,130 @@ jobs:
 
       - name: Run the test suite
         run: vendor/bin/pest
+
+  postgres:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Stock image, no extensions, no provider. Anything that only works on a
+        # particular managed Postgres will fail here.
+        image: postgres:16
+        env:
+          POSTGRES_DB: readlog
+          POSTGRES_USER: readlog
+          POSTGRES_PASSWORD: readlog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U readlog -d readlog"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The documented variables, and only those. The container has no TLS, so
+      # sslmode is "disable" here; a managed provider will want "require", which is
+      # the whole reason it is a variable.
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: readlog
+      DB_USERNAME: readlog
+      DB_PASSWORD: readlog
+      DB_SSLMODE: disable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, mbstring, fileinfo, curl, dom, xml, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate a clean Postgres database
+        run: php artisan migrate --force
+
+      - name: Seed the demo library
+        run: php artisan db:seed --force
+
+      - name: Seed again, which must be a no-op
+        run: |
+          php artisan db:seed --force
+          php artisan tinker --execute='
+            $books = App\Models\Book::count(); $entries = App\Models\ReadEntry::count();
+            echo "books=$books entries=$entries", PHP_EOL;
+            if ($books !== 12 || $entries !== 14) { fwrite(STDERR, "seeding is not idempotent on Postgres\n"); exit(1); }
+          '
+
+      - name: Confirm no migration is pending
+        # --pending=1 makes the command exit with status 1 if anything is pending.
+        run: php artisan migrate:status --pending=1
+
+      - name: Run the test suite against Postgres
+        # phpunit.xml sets DB_CONNECTION=sqlite for the local loop, but PHPUnit does
+        # not override variables that already exist in the process environment, so
+        # the DB_* values above win and the whole suite runs on the container.
+        run: vendor/bin/pest
+
+  compose:
+    # The "fresh clone to running app" claim, checked the way a reader would do it:
+    # a bare checkout with no .env, one command, and the health route answering.
+    # Then the same with the Postgres override, and a look inside to prove the
+    # rows are really in Postgres and not in a stray SQLite file.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start with SQLite (the default)
+        run: docker compose up --build -d --wait --wait-timeout 180
+
+      - name: Health route and home page answer
+        run: |
+          curl -fsS http://127.0.0.1:8080/up > /dev/null
+          curl -fsS http://127.0.0.1:8080/ | grep -q "Recently Read"
+          docker compose exec -T app php artisan tinker --execute='
+            echo DB::connection()->getDriverName(), " books=", App\Models\Book::count(), PHP_EOL;
+            if (DB::connection()->getDriverName() !== "sqlite" || App\Models\Book::count() < 1) exit(1);'
+
+      - name: A second start migrates nothing and seeds nothing
+        run: |
+          docker compose restart app
+          sleep 5
+          docker compose logs --since 60s app | grep -q "already populated"
+
+      - name: Stop
+        run: docker compose down
+
+      - name: Start with the Postgres override
+        run: docker compose -f compose.yaml -f compose.postgres.yaml up -d --wait --wait-timeout 180
+
+      - name: The app is on Postgres and the data is there
+        run: |
+          curl -fsS http://127.0.0.1:8080/up > /dev/null
+          curl -fsS "http://127.0.0.1:8080/library?q=dune" | grep -q "Yes! Found"
+          docker compose -f compose.yaml -f compose.postgres.yaml exec -T app php artisan tinker --execute='
+            if (DB::connection()->getDriverName() !== "pgsql") exit(1);'
+          test "$(docker compose -f compose.yaml -f compose.postgres.yaml exec -T db psql -U readlog -d readlog -tAc "select count(*) from books;")" = "12"
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f compose.yaml -f compose.postgres.yaml down -v
