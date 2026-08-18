@@ -307,12 +307,25 @@ it('allows two users to log the same book on the same date', function () {
 it('recovers when it loses the race to create a shared catalogue book', function () {
     // The .NET suite proves this with two real connections logging concurrently
     // (LogBookAsync_handles_a_concurrent_first_log_of_the_same_book). PHP has no
-    // threads to do that with, so the race is forced instead: a model event drops
-    // the winning row in between the existence check and the insert, which is
+    // threads to do that with, so the race is forced instead: the winning row is
+    // dropped in between the service's existence check and its insert, which is
     // exactly the window the recovery code exists for.
+    //
+    // The hook is a query listener that fires once, right after the SELECT that
+    // finds nothing. An earlier version used a Book::creating model event, which
+    // fires inside create() and therefore inside the savepoint the service now
+    // opens around the insert, so the simulated winner was rolled back together
+    // with the loser and the recovery had nothing to find. A concurrent writer's
+    // row would already be committed, and this arranges the same thing.
     $user = User::factory()->create();
 
-    Book::creating(function () {
+    $planted = false;
+    DB::listen(function ($query) use (&$planted) {
+        if ($planted || ! str_contains($query->sql, 'from "books"')) {
+            return;
+        }
+
+        $planted = true;
         DB::table('books')->insert([
             'title' => 'Winner',
             'open_library_id' => 'ol:race',
