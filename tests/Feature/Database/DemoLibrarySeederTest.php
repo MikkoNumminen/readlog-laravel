@@ -45,3 +45,14 @@ it('is idempotent, so seeding twice does not duplicate anything', function () {
         ->and(Book::count())->toBe(12)
         ->and(ReadEntry::count())->toBe(14);
 });
+
+it('runs correctly with mass-assignment guards on', function () {
+    // `artisan db:seed` wraps seeders in Model::unguarded(), which hides any attribute
+    // the allowlist would otherwise drop. Running the seeder directly keeps the guards
+    // on, so a regression here would mean the seeder had started leaning on that.
+    (new DemoLibrarySeeder)->run();
+
+    expect(User::whereNotNull('email_verified_at')->count())->toBe(2)
+        ->and(Book::count())->toBe(12)
+        ->and(ReadEntry::count())->toBe(14);
+});

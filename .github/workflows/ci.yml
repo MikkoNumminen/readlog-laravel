@@ -1,0 +1,51 @@
+# .NET counterpart: .github/workflows/ci.yml in readlog-dotnet, which restores,
+# builds and runs the xUnit suite. Same job, different toolchain: composer install
+# instead of dotnet restore, Pest instead of `dotnet test`, and an explicit
+# `migrate` step because Laravel has no compile stage that would catch a broken
+# migration.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, mbstring, fileinfo, curl, dom, xml, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Run migrations against a clean database
+        run: |
+          touch database/database.sqlite
+          php artisan migrate --force --seed
+
+      - name: Run the test suite
+        run: vendor/bin/pest

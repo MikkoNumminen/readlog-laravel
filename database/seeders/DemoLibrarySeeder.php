@@ -117,15 +117,19 @@ class DemoLibrarySeeder extends Seeder
 
     private function reader(string $name, string $email): User
     {
-        return User::updateOrCreate(
-            ['email' => $email],
-            [
-                'name' => $name,
-                'email_verified_at' => now(),
-                // Version 1 has no login, so this hash is never checked. It is set so
-                // that the column is valid the day authentication is added.
-                'password' => Hash::make('password'),
-            ],
-        );
+        // Assigned property by property rather than through updateOrCreate, on purpose.
+        // email_verified_at is not on the User mass-assignment allowlist, so fill()
+        // would drop it without a word. `artisan db:seed` happens to run models
+        // unguarded, which would hide that, but a seeder should not depend on the
+        // caller having switched the guard off.
+        $user = User::firstOrNew(['email' => $email]);
+        $user->name = $name;
+        $user->email_verified_at = now();
+        // Version 1 has no login, so this hash is never checked. It is set so that the
+        // column is valid the day authentication is added.
+        $user->password = Hash::make('password');
+        $user->save();
+
+        return $user;
     }
 }

@@ -2,7 +2,6 @@
 
 use App\Models\Book;
 use App\Models\ReadEntry;
-use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
