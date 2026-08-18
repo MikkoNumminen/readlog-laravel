@@ -42,7 +42,9 @@ are in readlog-dotnet. Everything else is in this repository.
 | `dotnet ef database update` | `php artisan migrate` | |
 | `dotnet format` | `vendor/bin/pint` | |
 | `Directory.Build.props` (nullable, analysers) | nothing equivalent | PHP has no compiler switches to turn on |
-| `.github/workflows/ci.yml` | `.github/workflows/ci.yml` | same job, different toolchain |
+| `.github/workflows/ci.yml` | `.github/workflows/ci.yml` | same job, different toolchain; this one also runs on Postgres and brings the compose stack up |
+| `Dockerfile` (SDK image builds, aspnet image runs) | `Dockerfile` plus `compose.yaml` | .NET compiles into the image; PHP copies the source in. Kestrel is server and runtime; here nginx fronts php-fpm |
+| `Database.Migrate()` at startup in `Program.cs` | `docker/entrypoint.sh` | .NET migrates inside the process; php-fpm runs no code until a request, so the entrypoint does it |
 
 ### Domain
 
@@ -107,6 +109,8 @@ shapes and the merge in the same cases.
 | `[Authorize]` | `app/Http/Middleware/RequireDemoUser.php` on a route group |
 | `src/ReadLog.Web/Auth/ClaimsPrincipalExtensions.cs` | `app/Services/CurrentUser.php` |
 | the `app.Use(...)` header block in `Program.cs` | `app/Http/Middleware/SecurityHeaders.php` |
+| `ForwardedHeadersOptions` in `Program.cs` (KnownProxies cleared) | `config/trustedproxy.php`, `TRUSTED_PROXIES` |
+| `/health` for the platform probe | `/up`, plus `php artisan readlog:smoke` for a person |
 | folder-based routing plus `app.MapRazorPages()` | `routes/web.php` |
 | `builder.Services.Add*` in `Program.cs` | `app/Providers/AppServiceProvider.php`, which is nearly empty |
 

@@ -23,6 +23,8 @@ The process is the point, so it is all here:
 - **[STATUS.md](STATUS.md)** is where the project stands, what each pull request
   contains, and what was deliberately not done.
 - **[TODO.md](TODO.md)** is what comes next, recorded rather than built.
+- **[DEMO.md](DEMO.md)** is the five-minute version of running it and putting it
+  on a public URL for a screen share.
 - The [pull requests](https://github.com/MikkoNumminen/readlog-laravel/pulls) carry
   a self-review each, including the bugs found while reviewing.
 
@@ -33,10 +35,28 @@ application, so this is the second port of the same behaviour.
 ## Status
 
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
-library search, and the multi-source lookup with its merge logic. 196 passing
-tests plus 3 live-API tests that are skipped by default. **There is no
-authentication**, deliberately, and the app ships a demo reader switcher in its
-place; see STATUS.md for that and for the other known gaps.
+library search, and the multi-source lookup with its merge logic. 213 passing
+tests plus 3 live-API tests that are skipped by default, run against both SQLite
+and Postgres in CI. **There is no authentication**, deliberately, and the app
+ships a demo reader switcher in its place; see STATUS.md for that and for the
+other known gaps.
+
+## Where it runs
+
+**Locally, on the author's machine, exposed on demand.** There is no hosted copy
+of this app and no plan to pay for one. It runs from a fresh clone with one
+Docker command, and when it needs to be shown to someone it is put on a temporary
+public URL through a Cloudflare quick tunnel for the length of the call and taken
+down afterwards; [DEMO.md](DEMO.md) is that procedure. Cloud deployment was
+looked at and dropped on cost; STATUS.md has the reasoning.
+
+The **.NET version is the one hosted publicly**: readlog-dotnet runs at
+<https://readlog-a2feef.azurewebsites.net/> on Azure App Service's free tier.
+
+The app itself is not tied to the machine it runs on. The database connection is
+entirely environment-driven and the code is tested against a stock Postgres as
+well as SQLite, so it runs on any standard PostgreSQL in production; what is
+missing is only a place to put it.
 
 ## Running it
 
@@ -68,6 +88,9 @@ docker compose -f compose.yaml -f compose.postgres.yaml up --build -d --wait
 `APP_PORT` (default `8080`) and `GOOGLE_BOOKS_API_KEY` are read from the shell or
 from a `.env` file next to `compose.yaml`.
 
+To put the running app on a temporary public URL, `scripts/tunnel-up.sh` (and
+`scripts/tunnel-down.sh` to close it). See [DEMO.md](DEMO.md).
+
 ### With PHP on the host
 
 - PHP 8.3 or newer, with `pdo_sqlite`, `sqlite3`, `mbstring`, `curl`, `fileinfo`,
@@ -88,9 +111,13 @@ last line.
 ## Running the tests
 
 ```bash
-vendor/bin/pest          # 196 tests, no network access
+vendor/bin/pest          # 213 tests, no network access
 vendor/bin/pint --test   # formatting
 ```
+
+CI runs the same suite against SQLite and against a stock `postgres:16` service
+container, and separately brings the compose stack up from a bare checkout and
+probes it, including the forwarded-header behaviour a tunnel relies on.
 
 The suite fakes every outbound HTTP request and fails on any it does not
 recognise, so it never leaves the machine. To check the faked provider responses
@@ -110,6 +137,11 @@ Everything has a working default. The two settings worth knowing:
 | --- | --- |
 | `GOOGLE_BOOKS_API_KEY` | Enables Google Books. Without it, search falls back to Open Library alone and the book detail page shows no details. Open Library needs no key. |
 | `BOOK_SEARCH_LIVE_TESTS` | Lets the tests tagged `live` call the real APIs. Off by default. |
+| `DB_CONNECTION` and `DB_*` | `sqlite` by default. Set `pgsql` plus host, port, database, user, password and `DB_SSLMODE` for any standard PostgreSQL; `.env.example` lists them. |
+| `TRUSTED_PROXIES` | Which upstream to believe about the original scheme and host. `*` inside compose; `127.0.0.1` for a local `cloudflared` in front of `php artisan serve`. Unset means forwarded headers are ignored. |
+
+`php artisan readlog:smoke [--url=...]` checks a running instance: health route,
+home page, database, migrations, demo data, providers.
 
 ### If search finds nothing on Windows
 
@@ -129,6 +161,7 @@ openssl.cafile = "C:/path/to/cacert.pem"
 ```
 app/
   Casts/DateOnly.php          # PHP has no date-only type; this is the stand-in
+  Console/Commands/SmokeCheck.php   # php artisan readlog:smoke
   Enums/Format.php            # Book / Audiobook / Ebook, with its display strings
   Http/Controllers/           # the Razor page models' counterparts
   Http/Middleware/            # [Authorize]'s counterpart, and the security headers
@@ -136,12 +169,18 @@ app/
   Models/                     # Eloquent models
   Services/                   # the reading-log domain and the two book providers
   Support/                    # readonly DTOs
+config/trustedproxy.php       # TRUSTED_PROXIES, for nginx and the tunnel
 database/
   migrations/                 # hand-written, unlike EF Core's generated ones
   seeders/DemoLibrarySeeder.php
 resources/views/              # Blade
 public/css/site.css           # one stylesheet, no framework, no build
 tests/                        # Pest
+Dockerfile, compose.yaml      # php-fpm + nginx, SQLite in a volume
+compose.postgres.yaml         # opt-in stock Postgres 16
+docker/                       # entrypoint and nginx config
+scripts/tunnel-up.sh, tunnel-down.sh
+DEMO.md                       # start, expose, verify, shut down
 ```
 
 ## Licence
