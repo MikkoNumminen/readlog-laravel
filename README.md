@@ -53,6 +53,21 @@ looked at and dropped on cost; STATUS.md has the reasoning.
 The **.NET version is the one hosted publicly**: readlog-dotnet runs at
 <https://readlog-a2feef.azurewebsites.net/> on Azure App Service's free tier.
 
+**A static snapshot of this app is browsable at
+<https://mikkonumminen.dev/readlog-laravel>.** It is the seeded demo library,
+crawled and saved as plain HTML: the feed, the library in both views, every
+book page, every reading entry, the log form and the account page look exactly
+as they do in the running app. Nothing on it is live: search, forms, the reader
+switcher and the Open Library and Google Books lookup do nothing there, and each
+page says so at the top. It is regenerated from this repository with one
+command:
+
+```bash
+composer snapshot        # php artisan readlog:snapshot -> build/snapshot/
+```
+
+and the output is committed into the portfolio site's `public/readlog-laravel/`.
+
 The app itself is not tied to the machine it runs on. The database connection is
 entirely environment-driven and the code is tested against a stock Postgres as
 well as SQLite, so it runs on any standard PostgreSQL in production; what is
