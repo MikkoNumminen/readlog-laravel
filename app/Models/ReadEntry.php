@@ -9,6 +9,7 @@ use Database\Factories\ReadEntryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -30,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property-read User $user
  * @property-read Book $book
+ * @property-read ReadEntryEmbedding|null $embedding
  */
 class ReadEntry extends Model
 {
@@ -77,5 +79,16 @@ class ReadEntry extends Model
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
+    }
+
+    /**
+     * The entry's embedding for the "ask your library" search, if Ollama has
+     * been reachable since the entry last changed. Absent is a normal state.
+     *
+     * @return HasOne<ReadEntryEmbedding, $this>
+     */
+    public function embedding(): HasOne
+    {
+        return $this->hasOne(ReadEntryEmbedding::class);
     }
 }
