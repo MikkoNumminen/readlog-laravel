@@ -178,3 +178,12 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 82 | No RAG corpus docs for the portfolio's chat backend | They would touch backend doc-count tests and the `verify:backend` chain; out of scope for "ship the snapshot", noted as a follow-up in the PR. |
 | 83 | The portfolio PR is not merged by this run | That repository's own rules require the author's explicit per-PR word. The readlog-laravel PRs follow the working mode of the earlier runs and merge on green. |
 | 84 | README links the snapshot URL before the portfolio PR merges | The path is fixed by the PR and the URL is deterministic; the link resolves the moment the portfolio deploys, and STATUS.md's ordering makes clear which merge comes first. |
+
+### Review of the snapshot work
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 85 | The output directory is wiped only if empty or marked as a previous snapshot | `--out=.` resolves to the project root and `deleteDirectory()` would have taken the checkout with it. A `.readlog-snapshot` marker file makes a directory provably ours; anything else is refused with a message. |
+| 86 | Per-run state is reset at the top of `handle()` | The console container reuses the command instance across `Artisan::call`s in one process; a second run found the first run's page map, queued nothing, wrote nothing and printed the first run's counts. Found by running it twice; the test that should have caught it asserted only that a stale file was gone, and now asserts the tree came back. |
+| 87 | CSRF tokens are stripped from snapshot forms | The forms are inert, and the tokens were the only per-render randomness: with them, no two runs were byte-identical and every refresh of the committed snapshot churned every page. Two runs are now identical, and a test says so. |
+| 88 | Cover names fall back to a short hash on collision | Google Books thumbnails all share the path `/books/content`; a name from the path alone would make every one the same file. Latent (the seed uses Open Library only), fixed anyway. |
