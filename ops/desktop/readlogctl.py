@@ -70,7 +70,15 @@ def dotenv() -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        values[key.strip()] = value.strip().strip('"').strip("'")
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip()
+        # Compose's reading of the same file: a quoted value is taken whole, an
+        # unquoted one ends at the first " #".
+        if value[:1] in ('"', "'") and value[-1:] == value[:1] and len(value) >= 2:
+            value = value[1:-1]
+        else:
+            value = value.split(" #", 1)[0].strip()
+        values[key] = value
     return values
 
 
@@ -80,12 +88,32 @@ APP_URL = f"http://127.0.0.1:{APP_PORT}"
 OLLAMA_NETWORK = ENV.get("OLLAMA_DOCKER_NETWORK", "")
 
 
+_network_present: bool | None = None
+
+
+def ollama_network_present(refresh: bool = False) -> bool:
+    """Does the network named in OLLAMA_DOCKER_NETWORK exist right now? Cached
+    for the process; `on` refreshes it. That network belongs to another compose
+    project, and its `down` removes it, so it can be absent while readlog is
+    perfectly able to run: compose.ollama.yaml declares it external and
+    `docker compose up` refuses to start when an external network is missing.
+    Without the network the app starts anyway and AI search degrades, which is
+    the right trade; the board says so."""
+    global _network_present
+    if not OLLAMA_NETWORK:
+        return False
+    if _network_present is None or refresh:
+        rc, _ = run(["docker", "network", "inspect", OLLAMA_NETWORK], timeout=10)
+        _network_present = rc == 0
+    return _network_present
+
+
 def compose_files() -> list[str]:
     """-f flags for every compose invocation. compose.ollama.yaml joins the app
     to another project's network, which is how the author's Ollama container is
-    reached; it is only added when that network is named in .env."""
+    reached; it is only added when that network is named in .env and exists."""
     files = ["-f", str(REPO / "compose.yaml")]
-    if OLLAMA_NETWORK:
+    if ollama_network_present():
         files += ["-f", str(REPO / "compose.ollama.yaml")]
     return files
 
@@ -267,9 +295,11 @@ def check_ollama(services: dict[str, str]) -> tuple[str, str]:
         return ("off", "unknown until the app is on")
     if ENV.get("AI_SEARCH_ENABLED", "true").lower() in ("0", "false", "no", "off"):
         return ("off", "AI search disabled (AI_SEARCH_ENABLED=false)")
+    if OLLAMA_NETWORK and not ollama_network_present():
+        return ("warn", f"network {OLLAMA_NETWORK} not found (its stack is down): search falls back to title matching")
     rc, out = compose(
         "exec", "-T", "app", "sh", "-c",
-        'curl -s -m 3 "${OLLAMA_URL:-http://localhost:11434}/api/tags" && echo && echo "URL=$OLLAMA_URL"',
+        'curl -s -m 3 "${OLLAMA_URL:-http://localhost:11434}/api/tags"; echo; echo "URL=${OLLAMA_URL:-http://localhost:11434}"',
         timeout=15,
     )
     url_line = next((ln for ln in out.splitlines() if ln.startswith("URL=")), "URL=?")
@@ -320,6 +350,9 @@ def do_on() -> int:
     if check_docker()[0] != "ok":
         print("  Docker Desktop is not running. Start it, wait for the whale to settle, then try again.")
         return 1
+    if OLLAMA_NETWORK and not ollama_network_present(refresh=True):
+        print(c(f"  Ollama's network {OLLAMA_NETWORK} does not exist (its stack is down); starting without it,", "33"))
+        print(c("  AI search will fall back to title matching. Run `on` again once that stack is up.", "33"))
     print("  == docker compose up (first start builds the image; a few minutes) ==")
     rc, _ = compose("up", "-d", "--wait", "--wait-timeout", "240", timeout=900, capture=False)
     if rc != 0:
@@ -480,7 +513,7 @@ def do_doctor() -> int:
     print(f"  compose files: {' '.join(compose_files()[1::2])}")
     print(f"  .env: {ENV_FILE if ENV_FILE.exists() else 'none (compose defaults)'}")
     if OLLAMA_NETWORK:
-        print(f"  ollama network: {OLLAMA_NETWORK}")
+        print(f"  ollama network: {OLLAMA_NETWORK} ({'present' if ollama_network_present(refresh=True) else 'absent'})")
     status, ms, _ = http_get(LIVE_SNAPSHOT + "/", timeout=8)
     print(f"  live snapshot: {LIVE_SNAPSHOT} -> {status if status else 'no answer'} ({ms:.0f} ms)")
     print()

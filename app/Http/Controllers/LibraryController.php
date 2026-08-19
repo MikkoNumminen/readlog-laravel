@@ -17,6 +17,8 @@ use Illuminate\View\View;
  */
 class LibraryController extends Controller
 {
+    private const ASK_MAX_LENGTH = 400;
+
     public function __construct(
         private readonly ReadLogService $readLog,
         private readonly CurrentUser $currentUser,
@@ -42,8 +44,10 @@ class LibraryController extends Controller
         // ?ask= is the AI question box. When Ollama cannot be used the question
         // is answered by the plain title search instead, and the page says so:
         // the reader always gets something, and never a broken page.
+        // Capped: a question is a sentence, and everything after this goes to
+        // the embedding model and into a prompt.
         $ask = $request->query('ask');
-        $ask = is_string($ask) && trim($ask) !== '' ? trim($ask) : null;
+        $ask = is_string($ask) && trim($ask) !== '' ? mb_substr(trim($ask), 0, self::ASK_MAX_LENGTH) : null;
         $askResult = $ask === null ? null : $this->ask->ask($userId, $ask);
         $askFallback = $askResult?->unavailable === true
             ? $this->readLog->checkIfRead($userId, $ask)

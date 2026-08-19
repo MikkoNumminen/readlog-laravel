@@ -6,7 +6,7 @@ was built and what of it is left.
 ## AI-assisted natural-language search: done
 
 Built in PRs 16, 18 and 19 as "ask your library"; README.md describes it and
-DECISIONS.md #94 to #103 record the choices. It kept the shape this file asked
+DECISIONS.md #94 to #108 record the choices. It kept the shape this file asked
 for: a deterministic layer in front of the model, embeddings over the entries
 in a plain table with cosine in PHP, a small local model that only phrases what
 was retrieved and can only cite what it was shown, and a fallback to the title

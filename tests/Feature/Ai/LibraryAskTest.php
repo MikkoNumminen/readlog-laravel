@@ -115,6 +115,17 @@ it('sends the model only entries that pass the exact filters, and tells the page
         ->not->toContain('The Hobbit');
 });
 
+it('applies "since" as a lower bound on the finished year', function () {
+    $user = User::factory()->create();
+    $e = shelf($user);
+    fakeOllama();
+
+    $result = asker()->ask($user->id, 'what have I read since 2025');
+
+    expect($result->applied)->toBe(['finished since 2025'])
+        ->and($result->closest->pluck('id')->sort()->values()->all())->toBe(collect([$e['dune']->id, $e['other']->id])->sort()->values()->all());
+});
+
 it('relaxes filters that match nothing rather than answering from nothing', function () {
     $user = User::factory()->create();
     shelf($user);

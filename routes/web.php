@@ -33,7 +33,9 @@ Route::post('/demo-user', [DemoUserController::class, 'update'])->name('demo-use
 // .NET counterpart: the [Authorize] attribute on the Log, Library, Edit and
 // Account page models.
 Route::middleware('demo.user')->group(function () {
-    Route::get('/library', [LibraryController::class, 'index'])->name('library.index');
+    // ?ask= runs a local model for seconds per request; the limiter (see
+    // AppServiceProvider) applies only when that parameter is present.
+    Route::get('/library', [LibraryController::class, 'index'])->middleware('throttle:ask')->name('library.index');
 
     Route::get('/library/{entry}/edit', [ReadEntryController::class, 'edit'])
         ->whereNumber('entry')

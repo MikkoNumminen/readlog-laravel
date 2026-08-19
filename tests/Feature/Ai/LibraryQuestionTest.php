@@ -28,9 +28,9 @@ it('finds the format', function (string $q, Format $format, string $label) {
     ['physical books only', Format::Book, 'books'],
 ]);
 
-it('does not read "books" alone as the print format', function () {
-    expect(parsed('books about dragons')->format)->toBeNull();
-});
+it('does not read "books" or "printed" alone as the print format', function (string $q) {
+    expect(parsed($q)->format)->toBeNull();
+})->with(['books about dragons', 'when was dune first printed', 'the print run of 1965']);
 
 it('finds an exact rating in digits or words', function (string $q, int $rating) {
     $p = parsed($q);
@@ -42,7 +42,14 @@ it('finds an exact rating in digits or words', function (string $q, int $rating)
     ['5/5 books', 5],
     ['rating of 3', 3],
     ['4 out of 5', 4],
+    ['rated 0', 0],
+    ['zero stars', 0],
 ]);
+
+it('does not read "starts" or "starring" as stars', function (string $q) {
+    $p = parsed($q);
+    expect($p->ratingExact)->toBeNull()->and($p->ratingMin)->toBeNull();
+})->with(['which one starts with a shipwreck', 'the one starring a detective', 'at least one starting point']);
 
 it('finds a minimum rating', function (string $q, int $min) {
     $p = parsed($q);
@@ -50,10 +57,23 @@ it('finds a minimum rating', function (string $q, int $min) {
 })->with([
     ['books with 4 stars or more', 4],
     ['at least 4 stars', 4],
+    ['rated at least 4', 4],
     ['3+ audio', 3],
     ['what did I read over 3 stars', 4],
     ['more than two stars', 3],
     ['4 or better', 4],
+    ['1 or more', 1],
+]);
+
+it('does not read a count of things as a rating', function (string $q) {
+    $p = parsed($q);
+    expect($p->ratingMin)->toBeNull()->and($p->ratingExact)->toBeNull()->and($p->unrated)->toBeFalse();
+})->with([
+    'at least 4 books',
+    'the 2 books I read over 3 weeks',
+    'authors I read one or more times',
+    'more than two audiobooks',
+    'the 3 audiobooks from june',
 ]);
 
 it('finds unrated', function (string $q) {
@@ -63,6 +83,11 @@ it('finds unrated', function (string $q) {
 it('combines format and unrated', function () {
     $p = parsed('unrated kindle books');
     expect($p->format)->toBe(Format::Ebook)->and($p->applied)->toBe(['e-books', 'not rated']);
+});
+
+it('reads "since" as a lower bound, not a year', function () {
+    $p = parsed('books I read since 2023');
+    expect($p->yearFrom)->toBe(2023)->and($p->year)->toBeNull()->and($p->applied)->toBe(['finished since 2023']);
 });
 
 it('finds a year only where a year sits', function (string $q, ?int $year) {
