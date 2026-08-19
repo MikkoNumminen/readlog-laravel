@@ -97,6 +97,12 @@ docker compose --profile tunnel up tunnel      # foreground; the URL is in the o
 - Log a book: search hits the real Open Library live. "dune herbert" is a safe
   query. Google Books joins in only if `GOOGLE_BOOKS_API_KEY` is set in a `.env`
   next to `compose.yaml` before `docker compose up`.
+- Ask the library, second box on the library page: "audiobooks I rated 5",
+  "what did I read last year", "something Finnish". Warm the models first
+  (`python ops/desktop/readlogctl.py warm`, or `on` does it) or the first
+  question can take half a minute; warm, answers take a few seconds. If the
+  board shows Ollama down the box still works, as the title search with a
+  notice, which is also worth showing.
 - Anyone on the URL is acting as whichever reader they pick. There is no login;
   that is a known, recorded gap (STATUS.md), and it is why the tunnel is closed
   the moment the demo ends.
