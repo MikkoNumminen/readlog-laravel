@@ -42,6 +42,9 @@ services:
       # request (artisan commands, the smoke check). Inside a request the request's
       # own host and scheme are used, which is what makes a tunnel work.
       APP_URL: http://localhost:${APP_PORT:-8080}
+      # readlog:smoke, run inside this container, must hit nginx by its service
+      # name; APP_URL above is the host's address and unreachable from in here.
+      SMOKE_URL: http://web
       # The app only ever sees nginx, and nginx (bound to loopback below) only ever
       # sees this machine's browser or the tunnel. Trusting the caller is what makes
       # X-Forwarded-Proto: https from cloudflared turn into https links and a Secure

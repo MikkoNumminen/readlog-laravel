@@ -35,7 +35,7 @@ application, so this is the second port of the same behaviour.
 ## Status
 
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
-library search, and the multi-source lookup with its merge logic. 213 passing
+library search, and the multi-source lookup with its merge logic. 222 passing
 tests plus 3 live-API tests that are skipped by default, run against both SQLite
 and Postgres in CI. **There is no authentication**, deliberately, and the app
 ships a demo reader switcher in its place; see STATUS.md for that and for the
@@ -112,7 +112,7 @@ last line.
 ## Running the tests
 
 ```bash
-vendor/bin/pest          # 213 tests, no network access
+vendor/bin/pest          # 222 tests, no network access
 vendor/bin/pint --test   # formatting
 ```
 

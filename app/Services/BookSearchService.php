@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Services\External\GoogleBooksClient;
 use App\Services\External\OpenLibraryClient;
 use App\Support\BookSearchResult;
+use App\Support\Redact;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
@@ -147,7 +148,7 @@ class BookSearchService
      */
     private function redact(string $message): string
     {
-        return (string) preg_replace('/([?&]key=)[^&\s]+/i', '$1REDACTED', $message);
+        return Redact::apiKey($message);
     }
 
     /**
