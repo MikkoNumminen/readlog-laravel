@@ -111,3 +111,25 @@ it('does not print a Google API key that appears in an error message', function 
         ->expectsOutputToContain('key=REDACTED')
         ->assertExitCode(1);
 });
+
+it('prints an exception message of "0" rather than replacing it with the class name', function () {
+    // strtok(...) ?: fallback treated the string "0" as empty.
+    Http::fake(fn () => throw new ConnectionException('0'));
+    ReadEntry::factory()->for(User::factory())->create();
+
+    $this->artisan('readlog:smoke')
+        ->expectsOutputToContain('failed: 0')
+        ->assertExitCode(1);
+});
+
+it('prefers SMOKE_URL over APP_URL when no --url is given', function () {
+    // Inside the compose app container APP_URL is the host's port and unreachable;
+    // compose sets SMOKE_URL to the nginx service so a bare readlog:smoke works.
+    config()->set('services.smoke.url', 'http://web');
+    fakeHealthyApp('http://web');
+    ReadEntry::factory()->for(User::factory())->create();
+
+    $this->artisan('readlog:smoke')
+        ->expectsOutputToContain('GET http://web/up returned 200')
+        ->assertExitCode(0);
+});

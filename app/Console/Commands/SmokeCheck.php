@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Book;
 use App\Models\ReadEntry;
+use App\Support\Redact;
 use Illuminate\Console\Command;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +37,7 @@ use Throwable;
 class SmokeCheck extends Command
 {
     protected $signature = 'readlog:smoke
-        {--url= : Base URL to check over HTTP (default: APP_URL)}
+        {--url= : Base URL to check over HTTP (default: SMOKE_URL, then APP_URL)}
         {--no-http : Skip the HTTP checks; verify database and configuration only}
         {--timeout=10 : Seconds to wait for each HTTP request}';
 
@@ -47,7 +48,11 @@ class SmokeCheck extends Command
 
     public function handle(Migrator $migrator): int
     {
-        $url = rtrim((string) ($this->option('url') ?: config('app.url')), '/');
+        // --url, else SMOKE_URL, else APP_URL. The middle one exists because inside
+        // the compose app container APP_URL names the host's port, which is not
+        // reachable from there; compose sets SMOKE_URL to the nginx service instead,
+        // so a bare `readlog:smoke` does the right thing wherever it is run.
+        $url = rtrim((string) ($this->option('url') ?: config('services.smoke.url') ?: config('app.url')), '/');
 
         if (! $this->option('no-http')) {
             $this->checkHealthRoute($url);
@@ -194,8 +199,12 @@ class SmokeCheck extends Command
     /** One line of an exception, without a stack trace or a credential-bearing URL. */
     private function brief(Throwable $e): string
     {
-        $message = preg_replace('/([?&]key=)[^&\s]+/i', '$1REDACTED', $e->getMessage()) ?? $e->getMessage();
+        $message = Redact::apiKey($e->getMessage());
 
-        return trim(strtok($message, "\n") ?: get_class($e));
+        // strtok() returns false on an empty message, and PHP would also treat a
+        // message of exactly "0" as empty under ?:, so the check is explicit.
+        $firstLine = trim((string) strtok($message, "\n"));
+
+        return $firstLine !== '' ? $firstLine : get_class($e);
     }
 }

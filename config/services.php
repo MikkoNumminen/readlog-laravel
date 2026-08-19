@@ -58,6 +58,13 @@ return [
         'base_url' => env('GOOGLE_BOOKS_BASE_URL', 'https://www.googleapis.com/books/v1/'),
     ],
 
+    // Where `php artisan readlog:smoke` points its HTTP checks when no --url is
+    // given. Falls back to APP_URL. Inside the compose app container APP_URL is
+    // the host's address and not reachable, so compose sets this to http://web.
+    'smoke' => [
+        'url' => env('SMOKE_URL'),
+    ],
+
     'book_search' => [
         // Seconds before a provider request is abandoned. Matches the 10 second
         // HttpClient.Timeout the .NET app sets on both typed clients.

@@ -53,7 +53,12 @@ class GoogleBooksClient
             return collect(); // degrade, do not throw
         }
 
+        // Provider JSON is untrusted in shape as well as content. One malformed
+        // element must not take the other results down with it, so non-array
+        // items are skipped rather than allowed to raise a TypeError that
+        // BookSearchService::settle would catch at the whole-response level.
         return collect($response->json('items') ?? [])
+            ->filter(fn ($item) => is_array($item))
             ->map(fn (array $item) => $this->mapSearchResult($item))
             ->values();
     }
@@ -92,20 +97,22 @@ class GoogleBooksClient
             return null;
         }
 
-        $info = $volume['volumeInfo'] ?? [];
+        $info = is_array($volume['volumeInfo'] ?? null) ? $volume['volumeInfo'] : [];
+
+        $authors = $this->stringList($info['authors'] ?? null);
 
         return new BookDetails(
-            title: $info['title'] ?? $title,
-            authors: $info['authors'] ?? ($author !== null ? [$author] : []),
-            description: $info['description'] ?? null,
-            categories: $info['categories'] ?? [],
-            publisher: $info['publisher'] ?? null,
-            publishedDate: $info['publishedDate'] ?? null,
-            pageCount: isset($info['pageCount']) ? (int) $info['pageCount'] : null,
-            coverUrl: $this->toHttps($info['imageLinks']['thumbnail'] ?? null),
-            language: $info['language'] ?? null,
-            previewLink: $info['previewLink'] ?? null,
-            infoLink: $info['infoLink'] ?? null,
+            title: $this->stringOrNull($info['title'] ?? null) ?? $title,
+            authors: $authors !== [] ? $authors : ($author !== null ? [$author] : []),
+            description: $this->stringOrNull($info['description'] ?? null),
+            categories: $this->stringList($info['categories'] ?? null),
+            publisher: $this->stringOrNull($info['publisher'] ?? null),
+            publishedDate: $this->stringOrNull($info['publishedDate'] ?? null),
+            pageCount: is_numeric($info['pageCount'] ?? null) ? (int) $info['pageCount'] : null,
+            coverUrl: $this->toHttps($this->stringOrNull($info['imageLinks']['thumbnail'] ?? null)),
+            language: $this->stringOrNull($info['language'] ?? null),
+            previewLink: $this->stringOrNull($info['previewLink'] ?? null),
+            infoLink: $this->stringOrNull($info['infoLink'] ?? null),
         );
     }
 
@@ -114,8 +121,8 @@ class GoogleBooksClient
      */
     private function mapSearchResult(array $item): BookSearchResult
     {
-        $info = $item['volumeInfo'] ?? [];
-        $subtitle = $info['subtitle'] ?? null;
+        $info = is_array($item['volumeInfo'] ?? null) ? $item['volumeInfo'] : [];
+        $subtitle = $this->stringOrNull($info['subtitle'] ?? null);
 
         // If the volume is part of a series, surface that as the subtitle.
         $seriesNumber = $info['seriesInfo']['bookDisplayNumber'] ?? null;
@@ -130,17 +137,48 @@ class GoogleBooksClient
             openLibraryId: 'google:'.($item['id'] ?? ''),
             title: $info['title'] ?? '',
             subtitle: $subtitle,
-            author: $info['authors'][0] ?? null,
+            author: $this->stringList($info['authors'] ?? null)[0] ?? null,
             firstPublishYear: $this->parseYear($info['publishedDate'] ?? null),
             pageCount: isset($info['pageCount']) ? (int) $info['pageCount'] : null,
-            coverUrl: $this->toHttps($info['imageLinks']['thumbnail'] ?? null),
+            coverUrl: $this->toHttps($this->stringOrNull($info['imageLinks']['thumbnail'] ?? null)),
         );
     }
 
-    /** Google often serves cover thumbnails over http; upgrade to https. */
+    /**
+     * Google often serves cover thumbnails over http; upgrade to https.
+     *
+     * Only the leading scheme. The .NET port used Replace("http:", "https:"),
+     * which rewrites every occurrence and would corrupt an embedded URL in a query
+     * string; the JavaScript original's String.replace touched the first occurrence
+     * only, which for a URL means the scheme. This follows the original.
+     */
     private function toHttps(?string $url): ?string
     {
-        return $url === null ? null : str_replace('http:', 'https:', $url);
+        return $url === null ? null : (preg_replace('/^http:/', 'https:', $url) ?? $url);
+    }
+
+    /**
+     * A JSON value that should be a list of strings, reduced to exactly that.
+     * A bare string becomes a one-element list; anything else non-string is dropped.
+     *
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if (is_string($value)) {
+            return $value === '' ? [] : [$value];
+        }
+
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter($value, fn ($item) => is_string($item) && $item !== ''));
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

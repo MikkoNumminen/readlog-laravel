@@ -23,7 +23,7 @@ things on 8080), pick another: `APP_PORT=8090 docker compose up -d --wait`.
 ## 2. Check it before anyone else does
 
 ```bash
-docker compose exec app php artisan readlog:smoke --url=http://web
+docker compose exec app php artisan readlog:smoke
 ```
 
 Seven rows, all PASS except a WARN on Google Books if you have not set a key

@@ -35,7 +35,7 @@ application, so this is the second port of the same behaviour.
 ## Status
 
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
-library search, and the multi-source lookup with its merge logic. 213 passing
+library search, and the multi-source lookup with its merge logic. 222 passing
 tests plus 3 live-API tests that are skipped by default, run against both SQLite
 and Postgres in CI. **There is no authentication**, deliberately, and the app
 ships a demo reader switcher in its place; see STATUS.md for that and for the
@@ -85,8 +85,9 @@ To run the same app on a stock Postgres 16 instead of SQLite, add the override:
 docker compose -f compose.yaml -f compose.postgres.yaml up --build -d --wait
 ```
 
-`APP_PORT` (default `8080`) and `GOOGLE_BOOKS_API_KEY` are read from the shell or
-from a `.env` file next to `compose.yaml`.
+`APP_PORT` (default `8080`), `APP_BIND` (default `127.0.0.1`, so nothing on the
+LAN reaches it unless you say `0.0.0.0`) and `GOOGLE_BOOKS_API_KEY` are read from
+the shell or from a `.env` file next to `compose.yaml`.
 
 To put the running app on a temporary public URL, `scripts/tunnel-up.sh` (and
 `scripts/tunnel-down.sh` to close it). See [DEMO.md](DEMO.md).
@@ -111,7 +112,7 @@ last line.
 ## Running the tests
 
 ```bash
-vendor/bin/pest          # 213 tests, no network access
+vendor/bin/pest          # 222 tests, no network access
 vendor/bin/pint --test   # formatting
 ```
 

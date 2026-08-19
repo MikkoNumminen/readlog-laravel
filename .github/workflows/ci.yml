@@ -169,7 +169,7 @@ jobs:
           grep -q 'href="https://demo.trycloudflare.com/library"' page.html
           ! grep -q 'http://localhost' page.html
           grep -i '^set-cookie: readlog-session=' headers.txt | grep -qi 'secure'
-          docker compose exec -T app php artisan readlog:smoke --url=http://web
+          docker compose exec -T app php artisan readlog:smoke
 
       - name: A second start migrates nothing and seeds nothing
         run: |

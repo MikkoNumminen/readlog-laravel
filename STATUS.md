@@ -24,7 +24,7 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-213 passing tests, 3 skipped (live API), 547 assertions, on SQLite and on Postgres 16
+222 passing tests, 3 skipped (live API), 562 assertions, on SQLite and on Postgres 16
 35 PHP files in app/, 13 Blade views, 20 test files
 ```
 
@@ -278,8 +278,8 @@ Everything below was run on the final state of the branch:
 
 ```
 php artisan migrate:fresh --seed        # clean database, 12 books, 14 entries
-vendor/bin/pest                         # 213 passed, 3 skipped, 547 assertions (SQLite)
-DB_CONNECTION=pgsql ... vendor/bin/pest # 213 passed, 3 skipped (Postgres 16)
+vendor/bin/pest                         # 222 passed, 3 skipped, 562 assertions (SQLite)
+DB_CONNECTION=pgsql ... vendor/bin/pest # 222 passed, 3 skipped (Postgres 16)
 vendor/bin/pint --test                  # passed
 BOOK_SEARCH_LIVE_TESTS=true \
   vendor/bin/pest --filter=LiveProvider # 1 passed, 2 skipped (no Google key)

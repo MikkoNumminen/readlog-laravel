@@ -185,3 +185,31 @@ it('survives a serialising cache store, unlike an object payload', function () {
 
     Http::assertSentCount(1);
 });
+
+it('reduces malformed authors and categories to lists of strings instead of failing', function () {
+    // Review finding: BookDetails::__construct types these as array, so a bare
+    // string or a list with junk in it used to be a TypeError, and a 500 on the
+    // book page, where the class's own contract is "degrade to null".
+    fakeVolume([
+        'title' => 'Dune',
+        'authors' => 'Frank Herbert',
+        'categories' => ['Fiction', null, 42, '', 'Science Fiction'],
+        'pageCount' => 'not a number',
+    ]);
+
+    $details = detailsService()->getDetails('Dune', null);
+
+    expect($details->authors)->toBe(['Frank Herbert'])
+        ->and($details->categories)->toBe(['Fiction', 'Science Fiction'])
+        ->and($details->pageCount)->toBeNull();
+});
+
+it('survives a volumeInfo that is not an object', function () {
+    Http::fake(['www.googleapis.com/*' => Http::response(['items' => [['id' => 'x', 'volumeInfo' => 'garbage']]])]);
+
+    $details = detailsService()->getDetails('Dune', 'Frank Herbert');
+
+    expect($details)->not->toBeNull()
+        ->and($details->title)->toBe('Dune')            // falls back to what was asked for
+        ->and($details->authors)->toBe(['Frank Herbert']);
+});

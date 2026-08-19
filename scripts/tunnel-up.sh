@@ -29,7 +29,11 @@ echo "[readlog] Making sure the app is up..."
 docker compose up -d --wait --wait-timeout 180 >/dev/null
 
 echo "[readlog] Opening a quick tunnel..."
-docker compose --profile tunnel up -d tunnel >/dev/null
+# --force-recreate: a tunnel container that was merely stopped (not removed by
+# tunnel-down.sh) would otherwise be restarted, and its log would carry the old,
+# dead hostname ahead of the new one; the URL scrape below would pick the old one.
+# A fresh container has a fresh log with exactly one hostname in it.
+docker compose --profile tunnel up -d --force-recreate tunnel >/dev/null
 
 # cloudflared prints the hostname once it has one. Give it up to 60 seconds.
 URL=""
