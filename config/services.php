@@ -81,10 +81,14 @@ return [
         'chat_model' => env('OLLAMA_CHAT_MODEL', 'qwen2.5:7b'),
         // Seconds. The probe is what decides "is Ollama there"; it must be fast,
         // because it runs on a page request. Embedding and generation may take
-        // longer, and generation is bounded because a demo cannot wait forever.
+        // longer: measured on a GPU shared with two other models, the first
+        // question after a while took 47 s (the chat model loading), the next
+        // ones 3 to 16 s. The bounds below let the first one through and still
+        // end a truly stuck request. `readlog:ask --warm` after start-up is
+        // what makes the first real question fast.
         'probe_timeout' => (int) env('OLLAMA_PROBE_TIMEOUT', 2),
-        'embed_timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 20),
-        'generate_timeout' => (int) env('OLLAMA_GENERATE_TIMEOUT', 45),
+        'embed_timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 60),
+        'generate_timeout' => (int) env('OLLAMA_GENERATE_TIMEOUT', 90),
         // Embedding one entry right after it is saved: short, because a cold
         // model can take half a minute to load and a save must not wait for it.
         // A missed embedding is filled in at the next search or by readlog:embed,
@@ -93,6 +97,17 @@ return [
         'backfill_embed_timeout' => (int) env('OLLAMA_BACKFILL_EMBED_TIMEOUT', 120),
         // How long a successful or failed probe is trusted before asking again.
         'probe_cache_seconds' => (int) env('OLLAMA_PROBE_CACHE', 60),
+        // nomic-embed-text is trained with task prefixes and ranks noticeably
+        // better with them; other models ignore or do not want them. Set both
+        // to empty for a model without prefixes. Changing the document prefix
+        // re-embeds every entry on the next readlog:embed (the hash covers it).
+        'embed_document_prefix' => env('OLLAMA_EMBED_DOCUMENT_PREFIX', 'search_document: '),
+        'embed_query_prefix' => env('OLLAMA_EMBED_QUERY_PREFIX', 'search_query: '),
+        // "Ask your library": how many ranked entries the chat model is shown,
+        // and how many still-unembedded entries one search will embed on the
+        // spot before answering (the rest wait for readlog:embed).
+        'ask_candidates' => (int) env('OLLAMA_ASK_CANDIDATES', 8),
+        'ask_backfill_limit' => (int) env('OLLAMA_ASK_BACKFILL_LIMIT', 50),
     ],
 
     'book_search' => [

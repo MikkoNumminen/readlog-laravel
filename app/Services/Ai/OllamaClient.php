@@ -155,13 +155,26 @@ class OllamaClient
         try {
             $response = Http::timeout($timeout)->acceptJson()->post($this->baseUrl().$path, $body);
         } catch (ConnectionException $e) {
-            $this->forgetAvailability();
+            // The exception message is what the page shows, so it is one plain
+            // sentence; the cURL detail goes to the log. A timeout is called out
+            // separately because on a shared GPU it usually means "a model is
+            // still loading, ask again", which is worth telling the reader.
+            $detail = Redact::apiKey($e->getMessage());
+            Log::info('Ollama request failed.', ['path' => $path, 'timeout' => $timeout, 'detail' => $detail]);
+            $timedOut = str_contains($detail, 'timed out') || str_contains($detail, 'cURL error 28');
+            if (! $timedOut) {
+                $this->forgetAvailability();
+            }
 
-            throw new OllamaUnavailableException('Ollama not reachable at '.$this->baseUrl().': '.Redact::apiKey($e->getMessage()), 0, $e);
+            throw new OllamaUnavailableException($timedOut
+                ? "Ollama at {$this->baseUrl()} did not answer within {$timeout} s; a model may still be loading, try again."
+                : "Ollama is not reachable at {$this->baseUrl()}.", 0, $e);
         }
 
         if ($response->failed()) {
-            throw new OllamaUnavailableException("Ollama answered {$response->status()} for {$path}: ".mb_substr($response->body(), 0, 200));
+            Log::info('Ollama answered with an error.', ['path' => $path, 'status' => $response->status(), 'body' => mb_substr($response->body(), 0, 300)]);
+
+            throw new OllamaUnavailableException("Ollama at {$this->baseUrl()} answered {$response->status()} for {$path}.");
         }
 
         return $response;

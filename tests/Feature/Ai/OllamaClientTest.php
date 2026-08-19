@@ -74,14 +74,26 @@ it('turns a connection failure into the one exception and forgets the cached pro
     expect(ollama()->isAvailable())->toBeTrue()
         ->and(Cache::has('ollama:available'))->toBeTrue();
 
-    expect(fn () => ollama()->embed(['x']))->toThrow(OllamaUnavailableException::class, 'not reachable');
+    expect(fn () => ollama()->embed(['x']))->toThrow(OllamaUnavailableException::class, 'not reachable at http://'.OLLAMA);
     expect(Cache::has('ollama:available'))->toBeFalse();
+});
+
+it('says "did not answer within" for a timeout, and keeps the probe cached because Ollama is up, just busy', function () {
+    Http::fake([
+        OLLAMA.'/api/tags' => Http::response(['models' => []]),
+        OLLAMA.'/api/generate' => fn () => throw new ConnectionException('cURL error 28: Operation timed out after 90001 milliseconds'),
+    ]);
+    config()->set('services.ollama.generate_timeout', 90);
+
+    expect(ollama()->isAvailable())->toBeTrue();
+    expect(fn () => ollama()->generate('hi'))->toThrow(OllamaUnavailableException::class, 'did not answer within 90 s');
+    expect(Cache::has('ollama:available'))->toBeTrue();
 });
 
 it('turns a non-2xx answer into the one exception', function () {
     Http::fake([OLLAMA.'/api/generate' => Http::response('model not found', 404)]);
 
-    expect(fn () => ollama()->generate('hi'))->toThrow(OllamaUnavailableException::class, '404');
+    expect(fn () => ollama()->generate('hi'))->toThrow(OllamaUnavailableException::class, 'answered 404 for /api/generate');
 });
 
 it('generates with temperature 0 and asks for JSON when told to', function () {
