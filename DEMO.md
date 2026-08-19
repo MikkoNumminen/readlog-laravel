@@ -91,7 +91,8 @@ stops resolving within seconds of the container going away.
 | Tunnel URL prints but a browser gets a Cloudflare error page | new hostname still propagating | wait 10 seconds and reload |
 | Links on the public URL say `http://localhost` | `TRUSTED_PROXIES` missing | it is set in `compose.yaml`; if you run the app outside compose, set `TRUSTED_PROXIES=127.0.0.1` in `.env` |
 | Search says "No books found." for everything | the container cannot reach openlibrary.org | `docker compose exec app wget -qO- https://openlibrary.org/ >/dev/null && echo ok` |
-| `scripts/tunnel-up.sh` gives no URL after 60s | image pull or Cloudflare unreachable | `docker compose --profile tunnel logs tunnel` |
+| `scripts/tunnel-up.sh` gives no URL after 60s | image pull or Cloudflare unreachable | `docker compose --profile tunnel logs tunnel`; if Docker Hub is the problem, use the native `cloudflared` below, it is the same tunnel |
+| E-mail addresses on the public URL show as "[email protected]" | Cloudflare's Scrape Shield rewrites them on `trycloudflare.com` | cosmetic; the account page is the only place one appears; a named tunnel on your own zone lets you turn it off |
 
 ## Running the app without Docker
 
@@ -123,14 +124,20 @@ is on Cloudflare; the tunnel itself is free.
 The hostname is yours for as long as the tunnel exists in the dashboard, and it
 only answers while the container is running.
 
-## What was checked, and what you must check yourself
+## What was checked
 
-Everything about the app behind a proxy is verified in the repository: five tests
-in `tests/Feature/Http/BehindProxyTest.php`, and the compose stack was driven
-locally with the exact headers cloudflared sends (`Host` plus
-`X-Forwarded-Proto: https`), producing https links and Secure cookies. What could
-not be verified from where this was written is the tunnel itself, because that
-environment cannot open one. Before the first real demo, run through this once:
+Everything above was run for real on 2026-08-19: a quick tunnel to the compose
+stack, `readlog:smoke` through it from inside the container, https links and a
+Secure cookie on the public host, reader switch and book logging through the
+tunnel, and the URL dead within five seconds of closing. The five steps below are
+kept as the check to repeat before a demo, since a tunnel is the one thing CI
+cannot exercise.
+
+## The five-step check before a demo
+
+Tests cover the app behind a proxy (`tests/Feature/Http/BehindProxyTest.php`) and
+CI drives the compose stack with the headers cloudflared sends; the tunnel itself
+was run for real once (above) and is the one thing CI cannot repeat, so:
 
 1. `scripts/tunnel-up.sh --smoke` prints a URL and every row is PASS or WARN.
 2. Open the URL in a private browser window. Home page renders with covers.
