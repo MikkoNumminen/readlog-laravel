@@ -37,3 +37,6 @@ Thumbs.db
 
 # Static snapshot output (php artisan readlog:snapshot)
 /build
+
+# Written by ops/desktop/readlogctl.py for a natively run cloudflared
+.tunnel.pid
