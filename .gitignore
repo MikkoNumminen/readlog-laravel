@@ -34,3 +34,6 @@ Thumbs.db
 
 # Written by scripts/tunnel-up.sh; the current public URL, if any
 .tunnel-url
+
+# Static snapshot output (php artisan readlog:snapshot)
+/build
