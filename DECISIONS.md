@@ -154,3 +154,17 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 70 | STATUS.md gets a "Hosting" section separate from "deliberately not done" | It is both a thing done (local runtime, tunnel, smoke check) and a thing not done (a hosted copy), and the automated-versus-manual split is what a reader coming to run it needs first. |
 | 71 | TODO.md lists three hosting options and recommends none, with a question mark | The brief asked for exactly that, and the honest reason is better than a false one: the trade is money against effort against control, and only the author knows which is cheapest for him. |
 | 72 | MIGRATION.md gains three mapping rows rather than a new section | The Dockerfile, the startup migration and the forwarded-headers block all have counterparts in readlog-dotnet now, and the mapping table is where a .NET reader looks for them. The narrative sections describe run 1 and stay as they were. |
+
+## Run 3: a static snapshot under the portfolio site
+
+### Phase 1: generate the snapshot
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 73 | An in-process crawler (`readlog:snapshot`) instead of `wget --mirror` | The brief allowed "wget or an equivalent script". This machine has no wget, and the author is on Windows; an artisan command hands each Request to the HTTP kernel and follows the links each page emits, which is the same crawl with no server to boot and no tool to install, identical on Windows, macOS, Linux and CI. |
+| 74 | Directory-per-page with `index.html`, links to clean paths | The portfolio is on Vercel with `cleanUrls` on and `trailingSlash` off, and is previewed with Astro's server; both serve `<base>/library` from `library/index.html`. `.html` links would redirect on one and 404 on the other. |
+| 75 | Cover images downloaded into the tree | The portfolio's CSP is `img-src 'self' data:`; the originals on covers.openlibrary.org would be blocked. A failed download is left pointing at the provider and reported, rather than silently substituting nothing. |
+| 76 | The snapshot is built from a throwaway seeded SQLite, never the current database | Reproducible from any checkout, and it can never leak whatever the developer's local database holds. The command restores the connection it found when it finishes; the test suite caught it not doing so. |
+| 77 | The banner is injected by the generator, in the app's own notice style | The banner describes the snapshot, so it belongs where the snapshot is made, and the pages carry only the app's stylesheet. Phase 2 copies the output; it does not post-process it. |
+| 78 | The `<script>` tag is dropped from snapshot pages | The only script auto-submits the reader switcher, which would POST to a static host. Forms stay in the markup, inert; the banner says so. |
+| 79 | Only the acting reader's entries are crawled | The app renders one reader at a time and the crawler is one visitor. Ten of the fourteen entries appear; switching reader would need a session per crawl and buys four more edit pages of the same shape. |
