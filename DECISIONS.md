@@ -168,3 +168,13 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 77 | The banner is injected by the generator, in the app's own notice style | The banner describes the snapshot, so it belongs where the snapshot is made, and the pages carry only the app's stylesheet. Phase 2 copies the output; it does not post-process it. |
 | 78 | The `<script>` tag is dropped from snapshot pages | The only script auto-submits the reader switcher, which would POST to a static host. Forms stay in the markup, inert; the banner says so. |
 | 79 | Only the acting reader's entries are crawled | The app renders one reader at a time and the crawler is one visitor. Ten of the fourteen entries appear; switching reader would need a session per crawl and buys four more edit pages of the same shape. |
+
+### Phase 2 (portfolio repo) and phase 3
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 80 | A directory under the portfolio's `public/`, since there was no snapshot convention to follow | `/readlog` and `/readlog-net` are Vercel redirects to hosted apps. A committed static tree served by the same Astro build is the closest fit; refreshing it is regenerate and copy. |
+| 81 | The portfolio's CV gained "PHP" and "ReadLog, three times" | Its tech-box test requires the CV's Languages row and the box to agree, and the box now claims PHP because the project does. Both edits are factual and flagged in the PR for veto. |
+| 82 | No RAG corpus docs for the portfolio's chat backend | They would touch backend doc-count tests and the `verify:backend` chain; out of scope for "ship the snapshot", noted as a follow-up in the PR. |
+| 83 | The portfolio PR is not merged by this run | That repository's own rules require the author's explicit per-PR word. The readlog-laravel PRs follow the working mode of the earlier runs and merge on green. |
+| 84 | README links the snapshot URL before the portfolio PR merges | The path is fixed by the PR and the URL is deterministic; the link resolves the moment the portfolio deploys, and STATUS.md's ordering makes clear which merge comes first. |
