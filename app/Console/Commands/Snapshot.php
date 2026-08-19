@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Symfony\Component\Console\Output\NullOutput;
 
 /**
  * Writes a static, browsable snapshot of the app to a directory.
@@ -88,6 +89,16 @@ class Snapshot extends Command
         $this->out = $this->resolveOut((string) $this->option('out'));
         $this->base = '/'.trim((string) $this->option('base'), '/');
 
+        // The console container hands back the same command instance for every
+        // Artisan::call in one process. Without this reset a second run would find
+        // its own first run's page map, queue nothing, write nothing, and print
+        // the first run's counts as if it had. Found by running it twice.
+        $this->pages = [];
+        $this->queue = [];
+        $this->covers = [];
+        $this->assets = [];
+        $this->coverFailures = 0;
+
         // Whatever database, cache and session the process was using are put back
         // when the crawl is done. This runs in-process, so leaving the default
         // connection pointed at the throwaway database would surprise anything that
@@ -112,6 +123,7 @@ class Snapshot extends Command
             $this->copyAssets();
         } finally {
             DB::purge('snapshot');
+            File::delete(storage_path('app/snapshot.sqlite'));
             DB::setDefaultConnection($previous['connection']);
             Config::set('database.default', $previous['database.default']);
             Config::set('cache.default', $previous['cache.default']);
@@ -150,16 +162,41 @@ class Snapshot extends Command
         DB::purge('snapshot');
         DB::setDefaultConnection('snapshot');
 
-        Artisan::call('migrate:fresh', ['--database' => 'snapshot', '--force' => true, '--quiet' => true]);
-        Artisan::call('db:seed', ['--class' => 'DemoLibrarySeeder', '--database' => 'snapshot', '--force' => true, '--quiet' => true]);
+        // Output goes to a null buffer rather than --quiet: --quiet is a console
+        // flag, not a command option, and Artisan::call rejects it outside the test
+        // harness.
+        $silent = new NullOutput;
+        Artisan::call('migrate:fresh', ['--database' => 'snapshot', '--force' => true], $silent);
+        Artisan::call('db:seed', ['--class' => 'DemoLibrarySeeder', '--database' => 'snapshot', '--force' => true], $silent);
     }
 
+    /** Written into every snapshot; its presence is what makes a directory safe to wipe. */
+    private const MARKER = '.readlog-snapshot';
+
+    /**
+     * The output directory is emptied before writing, and that is only safe when
+     * it is ours. Without a check, `--out=.` resolves to the project root and
+     * deleteDirectory() would take the checkout with it. A directory is wiped
+     * only if it is empty or carries the marker a previous run left behind.
+     */
     private function prepareOutput(): void
     {
         if (File::isDirectory($this->out)) {
+            $entries = array_diff(scandir($this->out) ?: [], ['.', '..']);
+
+            if ($entries !== [] && ! File::exists($this->out.'/'.self::MARKER)) {
+                throw new \RuntimeException(
+                    "Refusing to write into {$this->out}: it is not empty and was not written by readlog:snapshot. "
+                    .'Choose an empty directory or a previous snapshot directory.'
+                );
+            }
+
             File::deleteDirectory($this->out);
         }
+
         File::ensureDirectoryExists($this->out);
+        File::put($this->out.'/'.self::MARKER, 'Written by php artisan readlog:snapshot. Safe to delete.
+');
     }
 
     private function enqueue(string $url): void
@@ -306,9 +343,18 @@ class Snapshot extends Command
             return;
         }
 
-        $name = Str::slug(pathinfo(parse_url($url, PHP_URL_PATH) ?: 'cover', PATHINFO_FILENAME)) ?: md5($url);
+        // Open Library covers have a unique file name in the path (11481354-M.jpg)
+        // and keep it, so the tree stays readable. Google Books thumbnails all
+        // share the path /books/content and differ only in the query, so a name
+        // taken from the path would make every one of them the same file; any
+        // name already claimed by a different URL gets a short hash appended.
+        $name = Str::slug(pathinfo(parse_url($url, PHP_URL_PATH) ?: 'cover', PATHINFO_FILENAME)) ?: 'cover';
         $extension = pathinfo(parse_url($url, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION) ?: 'jpg';
         $relative = "assets/covers/{$name}.{$extension}";
+
+        if (in_array($relative, $this->covers, true)) {
+            $relative = "assets/covers/{$name}-".substr(sha1($url), 0, 8).".{$extension}";
+        }
 
         try {
             $response = Http::timeout(15)->get($url);
@@ -351,6 +397,11 @@ class Snapshot extends Command
 
             return $m[0];
         }, $html) ?? $html;
+
+        // CSRF tokens are per-render randomness in otherwise inert forms. Left in,
+        // no two runs of this command produce the same bytes and every refresh of
+        // a committed snapshot churns every page for nothing.
+        $html = preg_replace('~\s*<input type="hidden" name="_token" value="[^"]*" autocomplete="off">~', '', $html) ?? $html;
 
         if (! $this->option('keep-scripts')) {
             $html = preg_replace('~\s*<script src="[^"]*"></script>~', '', $html) ?? $html;

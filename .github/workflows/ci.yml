@@ -57,6 +57,17 @@ jobs:
       - name: Run the test suite
         run: vendor/bin/pest
 
+      - name: Generate the static snapshot end to end
+        # The tests fake the cover downloads; this run does not, so it also proves
+        # the crawl and the real provider images still fit together.
+        run: |
+          php artisan readlog:snapshot --out=/tmp/snapshot
+          test -f /tmp/snapshot/index.html
+          test -f /tmp/snapshot/library/list/index.html
+          test "$(find /tmp/snapshot/book -name index.html | wc -l)" = "12"
+          test "$(find /tmp/snapshot/assets/covers -type f | wc -l)" = "12"
+          ! grep -rl "http://localhost" /tmp/snapshot
+
   postgres:
     runs-on: ubuntu-latest
 

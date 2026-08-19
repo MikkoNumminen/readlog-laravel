@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\Snapshot;
+use App\Models\Book;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -125,4 +127,79 @@ it('leaves a cover pointing at the provider when the download fails, and says so
 
     expect(File::glob(snapshotDir().'/assets/covers/*'))->toHaveCount(0)
         ->and(File::get(snapshotDir().'/index.html'))->toContain('covers.openlibrary.org');
+});
+
+it('refuses to wipe a directory it did not write', function () {
+    // --out=. resolves to the project root. Without this guard the command
+    // would delete the checkout to make room for the snapshot.
+    File::ensureDirectoryExists(snapshotDir());
+    File::put(snapshotDir().'/precious.txt', 'not yours');
+    fakeCovers();
+
+    expect(fn () => $this->artisan('readlog:snapshot', ['--out' => snapshotDir()]))
+        ->toThrow(RuntimeException::class, 'Refusing to write into');
+
+    expect(File::exists(snapshotDir().'/precious.txt'))->toBeTrue();
+});
+
+it('happily overwrites its own previous output', function () {
+    fakeCovers();
+
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+    File::put(snapshotDir().'/stale.html', 'from an older run');
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+
+    // The second run must produce a full tree, not only remove the stale file:
+    // the console container reuses the command instance, and a first version
+    // kept its page map between runs and wrote nothing the second time.
+    expect(File::exists(snapshotDir().'/stale.html'))->toBeFalse()
+        ->and(File::exists(snapshotDir().'/.readlog-snapshot'))->toBeTrue()
+        ->and(File::exists(snapshotDir().'/index.html'))->toBeTrue()
+        ->and(File::glob(snapshotDir().'/book/*/index.html'))->toHaveCount(12);
+});
+
+it('gives covers that share a path but not a URL distinct file names', function () {
+    // Google Books thumbnails are all /books/content?id=...; a name taken from
+    // the path alone would make every one of them the same file. The seeded
+    // snapshot database only carries Open Library covers, so the naming is
+    // exercised directly.
+    Http::fake(['books.google.com/*' => Http::response('gb', 200)]);
+    File::ensureDirectoryExists(snapshotDir());
+
+    $command = new Snapshot;
+    $reflect = new ReflectionClass($command);
+    $reflect->getProperty('out')->setValue($command, snapshotDir());
+    $fetch = $reflect->getMethod('fetchCover');
+
+    $fetch->invoke($command, 'https://books.google.com/books/content?id=AAA&printsec=frontcover');
+    $fetch->invoke($command, 'https://books.google.com/books/content?id=BBB&printsec=frontcover');
+
+    $covers = array_values($reflect->getProperty('covers')->getValue($command));
+
+    expect($covers)->toHaveCount(2)
+        ->and($covers[0])->not->toBe($covers[1])
+        ->and(File::glob(snapshotDir().'/assets/covers/*'))->toHaveCount(2);
+});
+
+it('leaves no temporary database behind', function () {
+    fakeCovers();
+
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+
+    expect(File::exists(storage_path('app/snapshot.sqlite')))->toBeFalse();
+});
+
+it('produces byte-identical output on two runs', function () {
+    // A committed snapshot is refreshed by regenerate-and-copy; a diff on that
+    // copy should show real changes only, never per-render randomness.
+    fakeCovers();
+
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+    $first = collect(File::allFiles(snapshotDir()))->mapWithKeys(fn ($f) => [$f->getRelativePathname() => md5_file($f->getPathname())])->all();
+
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+    $second = collect(File::allFiles(snapshotDir()))->mapWithKeys(fn ($f) => [$f->getRelativePathname() => md5_file($f->getPathname())])->all();
+
+    expect($second)->toBe($first)
+        ->and(File::get(snapshotDir().'/account/index.html'))->not->toContain('name="_token"');
 });
