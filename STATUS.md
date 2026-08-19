@@ -150,15 +150,18 @@ into the image, and three tests that were wrong when first written.
 - CI proving all of the above on every push: SQLite suite, Postgres suite,
   compose stack on both databases with the proxy check.
 
-**Manual, because it cannot be done from the repository or from CI:**
-
-- Actually opening a Cloudflare tunnel. Neither CI nor the environment this was
-  written in can, so the last step of the chain, Cloudflare itself, has been
-  verified only up to the headers it is documented to send.
-- The one-time walk-through at the end of DEMO.md, five steps: open the tunnel
-  with `--smoke`, load the URL in a private window, switch reader, log a book,
-  close the tunnel and confirm the URL dies. That is the author's remaining
-  work, in that order, and it takes about three minutes.
+**Verified by hand on 2026-08-19, and not something CI can do:** a real
+Cloudflare quick tunnel was opened to the running compose stack, and every step
+of the DEMO.md walk-through passed: `readlog:smoke` run from inside the app
+container against the public URL (out through Cloudflare, back through nginx),
+https links on the tunnel host, a Secure session cookie, the reader switch and a
+logged book both surviving the round trip (session and CSRF), and the URL
+answering 502 within five seconds of the tunnel closing. Two notes from doing
+it: Docker Hub was unreachable from that network, so the native `cloudflared`
+path from DEMO.md was used instead of the compose profile; and Cloudflare's
+edge rewrites e-mail addresses on `trycloudflare.com` pages into
+"[email protected]" links (its Scrape Shield feature), which is cosmetic and
+recorded in DEMO.md.
 
 **What was dropped, and why.** Run 2 began as Laravel Cloud deployment support:
 a Postgres-backed instance on a paid platform with a public URL. The

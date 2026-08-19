@@ -86,20 +86,6 @@ here in run 1 that turned out wrong: it said `APP_URL` would need to match the
 tunnel host. It does not; with a trusted proxy the app uses the request's own
 forwarded scheme and host, and `APP_URL` only matters outside a request.
 
-**Verify the tunnel end to end.** Not yet done, and next on the list. Everything
-short of Cloudflare is proven (tests, CI, the compose stack driven with
-Cloudflare's own headers), but no tunnel has been opened from this repository
-yet. The author's note: the Cloudflare account may already be at its tunnel
-limit, and there should be three slots. Two things follow from that. The quick
-tunnel (`scripts/tunnel-up.sh`, `--profile tunnel`) is not tied to any account
-and should not count against a limit, so it is the one to try first. If it is
-the named tunnel that is wanted, or the quick one fails for an account-shaped
-reason, the place to look is Zero Trust > Networks > Tunnels: existing tunnels
-can be deleted or reused, and one of them can be pointed at `web:80` for this
-app rather than creating a fourth. The five checks at the end of DEMO.md are the
-acceptance test; when they pass, this entry goes and STATUS.md's "manual" list
-loses its first item.
-
 **Hosting?** Open. The app currently runs on the author's machine and is exposed
 on demand, which is deliberate: zero cost, no third-party account holding a copy,
 and a demo is the only audience it has had. Cloud deployment was started in run 2
