@@ -1,0 +1,22 @@
+# Use this override when Ollama runs as another compose project's container on
+# this machine, instead of natively on the host. It joins the app to that
+# project's network so OLLAMA_URL can name the container:
+#
+#     OLLAMA_DOCKER_NETWORK=mikkonumminendev_default        (in .env)
+#     OLLAMA_URL=http://mikkonumminendev-ollama-1:11434     (in .env)
+#     docker compose -f compose.yaml -f compose.ollama.yaml up -d
+#
+# ops/desktop/readlogctl.py adds this file by itself whenever
+# OLLAMA_DOCKER_NETWORK is set. Without it, compose.yaml's default of
+# host.docker.internal:11434 reaches an Ollama installed on the host.
+
+services:
+  app:
+    networks:
+      - default
+      - ollama
+
+networks:
+  ollama:
+    external: true
+    name: ${OLLAMA_DOCKER_NETWORK:?set OLLAMA_DOCKER_NETWORK to the network Ollama's container is on}

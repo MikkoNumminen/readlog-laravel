@@ -52,7 +52,9 @@ other known gaps.
 of this app and no plan to pay for one. It runs from a fresh clone with one
 Docker command, and when it needs to be shown to someone it is put on a temporary
 public URL through a Cloudflare quick tunnel for the length of the call and taken
-down afterwards; [DEMO.md](DEMO.md) is that procedure. Cloud deployment was
+down afterwards; [DEMO.md](DEMO.md) is that procedure, and `ops/desktop/`
+holds a desktop control (status board, on, off, tunnel on and off) so it is a
+double-click rather than a procedure. Cloud deployment was
 looked at and dropped on cost; STATUS.md has the reasoning.
 
 The **.NET version is the one hosted publicly**: readlog-dotnet runs at

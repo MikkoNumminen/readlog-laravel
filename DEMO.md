@@ -7,6 +7,37 @@ needs an account. Docker Desktop must be running; that is the only requirement.
 All commands are run from the repository root. On Windows use Git Bash for the
 `scripts/*.sh` lines; every `docker compose` line works in PowerShell too.
 
+## 0. Or skip the commands: the desktop control
+
+Everything below is also a menu. `ops/desktop/readlogctl.py` shows a status
+board (Docker, both containers, whether the app answers, the tunnel and its URL,
+whether Ollama is reachable for the AI search) and offers on, off, open in the
+browser, tunnel on, tunnel off, logs, smoke check and the AI index rebuild.
+Plain Windows Python, nothing to install. Put it on the desktop once:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ops\desktop\install.ps1
+```
+
+That creates the "ReadLog Control" shortcut (and fetches a `cloudflared.exe`
+into `%LOCALAPPDATA%\Programs\cloudflared` if neither the binary nor the Docker
+image is available, which is the case on a network where Docker Hub pulls
+fail). Double-click it; the same script also works one-shot from any shell:
+
+```bash
+python ops/desktop/readlogctl.py status      # the board
+python ops/desktop/readlogctl.py on          # steps 1 and 2 below
+python ops/desktop/readlogctl.py tunnel on   # step 3
+python ops/desktop/readlogctl.py tunnel off  # step 5, first half
+python ops/desktop/readlogctl.py off         # step 5, second half
+```
+
+Settings come from `.env` next to `compose.yaml`: `APP_PORT`, `OLLAMA_URL`, and
+`OLLAMA_DOCKER_NETWORK` when Ollama runs as another compose project's
+container (that adds `compose.ollama.yaml`, which joins the app to that
+network). Off closes an open tunnel first, so there is no state where the app is
+down and the address still answers.
+
 ## 1. Start the app (about 30 seconds the first time, 5 after that)
 
 ```bash
