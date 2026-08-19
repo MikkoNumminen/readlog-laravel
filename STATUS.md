@@ -212,15 +212,6 @@ This is a real loss of a guarantee, so
 gap rather than a comment hiding it. It should fail and be rewritten when the
 constraint is restored.
 
-### Editing an entry onto an occupied date returns a 500
-
-The unique `(user_id, book_id, finished_at)` index rejects the update and nothing
-catches the violation. readlog-dotnet has exactly the same hole in
-`Pages/Library/Edit.cshtml.cs`, and the brief said to match behaviour rather than
-improve on it, so it was ported as found. Pinned by a test in
-`tests/Feature/Http/EntryEditTest.php`. The fix is a five-line copy of the pattern
-`ReadLogService::logBook()` already uses; it is in TODO.md.
-
 ### Two flaws in the merge logic, carried over on purpose
 
 `BookSearchService::deduplicate()` resolves conflicts between providers by

@@ -138,10 +138,3 @@ lives only in request validation. A SQLite trigger, or a raw `CREATE TABLE` in t
 migration, would restore it. The test
 `tests/Feature/Database/SchemaConstraintsTest.php` currently asserts the gap, so
 it is the test that should fail and be rewritten when this is done.
-
-**Editing an entry onto an occupied date returns a 500.** The unique
-`(user_id, book_id, finished_at)` index rejects it and nothing catches the
-violation, so the user sees an error page. readlog-dotnet has exactly the same
-hole, which is why it was ported rather than fixed. `ReadLogService::logBook()`
-already has the pattern to copy: catch `UniqueConstraintViolationException`,
-confirm by re-querying, and throw `DuplicateReadEntryException`.

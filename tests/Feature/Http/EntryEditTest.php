@@ -4,7 +4,6 @@ use App\Enums\Format;
 use App\Models\Book;
 use App\Models\ReadEntry;
 use App\Models\User;
-use Illuminate\Database\UniqueConstraintViolationException;
 
 it('renders the edit form for an owned entry', function () {
     $user = User::factory()->create();
@@ -112,28 +111,38 @@ it('rejects an out-of-range rating on edit', function () {
     expect($entry->fresh()->rating)->toBe(2);
 });
 
-it('rejects an edit that would collide with another entry on the same date', function () {
-    // The unique (user, book, finished date) index applies to edits too. The source
-    // has no explicit handling for this either, so the check is that it surfaces as
-    // a server error rather than silently corrupting anything.
+it('rejects an edit that would collide with another entry on the same date, with a message', function () {
+    // The unique (user, book, finished date) index applies to edits too. The
+    // source has no handling for this and answers 500; that hole was ported as
+    // found (see DECISIONS.md 27) and is now closed: the same domain exception
+    // logBook raises, the same message the log form shows, the row untouched.
     $user = User::factory()->create();
     $book = Book::factory()->create();
     ReadEntry::factory()->for($user)->for($book)->create(['finished_at' => '2024-01-01']);
     $second = ReadEntry::factory()->for($user)->for($book)->create(['finished_at' => '2024-02-01']);
 
-    // The request runs inside a savepoint. In production every request is its own
-    // transaction scope, so a failed UPDATE leaves the connection usable. Under
-    // RefreshDatabase the whole test is one transaction, and on Postgres a failed
-    // statement aborts that transaction, so the ->fresh() below would fail with
-    // "current transaction is aborted" instead of proving the row is untouched.
-    // Rolling back to a savepoint reproduces the production boundary.
-    expect(fn () => DB::transaction(fn () => actingAsReader($user)
-        ->withoutExceptionHandling()
-        ->put("/library/{$second->id}", [
-            'format' => Format::Book->value,
-            'finished_at' => '2024-01-01',
-            'rating' => null,
-        ])))->toThrow(UniqueConstraintViolationException::class);
+    actingAsReader($user)->from("/library/{$second->id}/edit")->put("/library/{$second->id}", [
+        'format' => Format::Book->value,
+        'finished_at' => '2024-01-01',
+        'rating' => null,
+    ])
+        ->assertRedirect("/library/{$second->id}/edit")
+        ->assertSessionHasErrors(['form' => "You've already logged this book with that finished date."]);
 
     expect($second->fresh()->finished_at->toDateString())->toBe('2024-02-01');
+});
+
+it('still lets an entry keep its own date on edit', function () {
+    // Saving the form without changing the date must not be mistaken for a
+    // collision with itself.
+    $user = User::factory()->create();
+    $entry = ReadEntry::factory()->for($user)->create(['finished_at' => '2024-02-01', 'rating' => 1]);
+
+    actingAsReader($user)->put("/library/{$entry->id}", [
+        'format' => Format::Book->value,
+        'finished_at' => '2024-02-01',
+        'rating' => 5,
+    ])->assertRedirect('/library');
+
+    expect($entry->fresh()->rating)->toBe(5);
 });

@@ -189,3 +189,9 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 88 | Cover names fall back to a short hash on collision | Google Books thumbnails all share the path `/books/content`; a name from the path alone would make every one the same file. Latent (the seed uses Open Library only), fixed anyway. |
 | 89 | The tunnel was verified with the native `cloudflared` binary, not the compose profile | Docker Hub was unreachable from the machine at the time (`tls: bad record MAC` on every pull), and DEMO.md already documents the native path as equivalent. The app-side behaviour under test is identical either way; the profile itself is a `docker compose up` of a stock image. |
 | 90 | Cloudflare's e-mail obfuscation on `trycloudflare.com` is documented, not worked around | It rewrites the one address on the account page into a "[email protected]" link. Cosmetic, outside the app, and switchable off only on a zone the author owns; a note in DEMO.md is the right amount of effort. |
+
+## Run 4: closing the list
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 91 | The edit-collision hole is closed rather than kept as a faithful port of the .NET one | Decision 27 kept it because the source has it. The author asked for the list to be closed, a date picker is exactly where a person lands on an occupied day by accident, and the fix is the pattern `logBook` already uses: catch the unique violation inside a savepoint, confirm it is a real collision, raise the same domain exception, show the same message. The pinned-hole test became the fixed-behaviour test. |

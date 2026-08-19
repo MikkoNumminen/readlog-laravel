@@ -150,6 +150,8 @@ class ReadLogService
 
     /**
      * @return bool false if the entry does not exist or is not owned by this user (treat as 404)
+     *
+     * @throws DuplicateReadEntryException when the new date collides with another entry for the same book
      */
     public function updateReadEntry(int $userId, int $entryId, UpdateReadEntryData $data): bool
     {
@@ -169,7 +171,30 @@ class ReadLogService
         $entry->format = $data->format;
         $entry->finished_at = $data->finishedAt;
         $entry->rating = $data->rating; // null clears, 0 is a real rating
-        $entry->save();
+
+        try {
+            // Same savepoint reasoning as logBook: Postgres aborts the transaction on
+            // a constraint violation, and the confirming query below must still run.
+            ReadEntry::query()->withSavepointIfNeeded(fn () => $entry->save());
+        } catch (UniqueConstraintViolationException $e) {
+            // Moving the entry onto a date where this user already has this book is
+            // the same unique (user, book, finished-on) rule that logBook enforces.
+            // readlog-dotnet has no handling here and answers 500; that hole was
+            // ported as found and is now closed, because a date picker is exactly
+            // where a person lands on an occupied day by accident.
+            $collides = ReadEntry::query()
+                ->where('user_id', $userId)
+                ->where('book_id', $entry->book_id)
+                ->where('finished_at', $data->finishedAt)
+                ->where('id', '!=', $entry->id)
+                ->exists();
+
+            if ($collides) {
+                throw new DuplicateReadEntryException;
+            }
+
+            throw $e;
+        }
 
         $this->forgetPublicFeed();
 
