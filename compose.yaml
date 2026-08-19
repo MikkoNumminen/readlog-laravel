@@ -25,7 +25,9 @@
 #
 # Optional settings are read from the shell or from a .env file next to this
 # file: APP_PORT (default 8080), APP_BIND (default 127.0.0.1), GOOGLE_BOOKS_API_KEY
-# (default unset), CLOUDFLARE_TUNNEL_TOKEN (only for the named-tunnel profile).
+# (default unset), OLLAMA_URL (default the host's Ollama on 11434),
+# AI_SEARCH_ENABLED (default true), CLOUDFLARE_TUNNEL_TOKEN (only for the
+# named-tunnel profile).
 
 name: readlog
 
@@ -61,6 +63,15 @@ services:
       QUEUE_CONNECTION: sync
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
       BOOK_SEARCH_LIVE_TESTS: "false"
+      # Optional local Ollama for "ask your library". host.docker.internal is the
+      # host machine from inside the container (Docker Desktop provides the name;
+      # extra_hosts below adds it on plain Linux). Set OLLAMA_URL to reach an
+      # Ollama that runs as another container instead. Unreachable is fine: the
+      # search falls back to title matching and says so.
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      AI_SEARCH_ENABLED: ${AI_SEARCH_ENABLED:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Named, not bind-mounted: the SQLite file, sessions and the view cache must
       # persist across `docker compose down` and must be owned by the container's

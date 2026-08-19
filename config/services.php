@@ -65,6 +65,36 @@ return [
         'url' => env('SMOKE_URL'),
     ],
 
+    /*
+    | Ollama, for the AI-assisted "ask your library" search. Everything degrades
+    | when it is absent: the app never depends on it, and a search box that
+    | cannot reach Ollama falls back to the title match with a one-line notice.
+    |
+    | Two models: one to embed entries and questions, one to phrase an answer over
+    | the entries the deterministic layer already retrieved. Both are local; no
+    | request ever leaves the machine.
+    */
+    'ollama' => [
+        'enabled' => filter_var(env('AI_SEARCH_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'url' => rtrim((string) env('OLLAMA_URL', 'http://localhost:11434'), '/'),
+        'embed_model' => env('OLLAMA_EMBED_MODEL', 'nomic-embed-text'),
+        'chat_model' => env('OLLAMA_CHAT_MODEL', 'qwen2.5:7b'),
+        // Seconds. The probe is what decides "is Ollama there"; it must be fast,
+        // because it runs on a page request. Embedding and generation may take
+        // longer, and generation is bounded because a demo cannot wait forever.
+        'probe_timeout' => (int) env('OLLAMA_PROBE_TIMEOUT', 2),
+        'embed_timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 20),
+        'generate_timeout' => (int) env('OLLAMA_GENERATE_TIMEOUT', 45),
+        // Embedding one entry right after it is saved: short, because a cold
+        // model can take half a minute to load and a save must not wait for it.
+        // A missed embedding is filled in at the next search or by readlog:embed,
+        // which uses the long timeout below precisely so it can absorb that load.
+        'write_embed_timeout' => (int) env('OLLAMA_WRITE_EMBED_TIMEOUT', 5),
+        'backfill_embed_timeout' => (int) env('OLLAMA_BACKFILL_EMBED_TIMEOUT', 120),
+        // How long a successful or failed probe is trusted before asking again.
+        'probe_cache_seconds' => (int) env('OLLAMA_PROBE_CACHE', 60),
+    ],
+
     'book_search' => [
         // Seconds before a provider request is abandoned. Matches the 10 second
         // HttpClient.Timeout the .NET app sets on both typed clients.

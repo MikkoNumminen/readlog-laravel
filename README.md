@@ -5,6 +5,11 @@ log what you finish with a format (book, audiobook or e-book), a finished-on dat
 and a 0 to 5 star rating, then browse, search, edit and delete your library. There
 is an account page with reading stats and a public "recently read" feed.
 
+**Live site:** <https://mikkonumminen.dev/readlog-laravel>, a static snapshot of
+the seeded library served from the author's portfolio (details under
+[Where it runs](#where-it-runs)). The app itself runs on the author's own machine and goes on
+a public URL on demand; [DEMO.md](DEMO.md) is how.
+
 This repository is a **documented migration** of
 [readlog-dotnet](https://github.com/MikkoNumminen/readlog-dotnet) (ASP.NET Core 8,
 Razor Pages, EF Core) to Laravel 13, done as a learning-in-public exercise by a
@@ -155,6 +160,7 @@ Everything has a working default. The two settings worth knowing:
 | `BOOK_SEARCH_LIVE_TESTS` | Lets the tests tagged `live` call the real APIs. Off by default. |
 | `DB_CONNECTION` and `DB_*` | `sqlite` by default. Set `pgsql` plus host, port, database, user, password and `DB_SSLMODE` for any standard PostgreSQL; `.env.example` lists them. |
 | `TRUSTED_PROXIES` | Which upstream to believe about the original scheme and host. `*` inside compose; `127.0.0.1` for a local `cloudflared` in front of `php artisan serve`. Unset means forwarded headers are ignored. |
+| `OLLAMA_URL` and `AI_SEARCH_ENABLED` | Where a local [Ollama](https://ollama.com) answers, for the "ask your library" search. Default `http://localhost:11434` (`host.docker.internal` inside compose), on. Unreachable is fine: the search falls back to title matching and says so. `php artisan readlog:embed` backfills the embeddings for an existing library. |
 
 `php artisan readlog:smoke [--url=...]` checks a running instance: health route,
 home page, database, migrations, demo data, providers.

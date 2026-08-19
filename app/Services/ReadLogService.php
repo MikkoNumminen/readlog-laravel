@@ -6,6 +6,8 @@ use App\Enums\Format;
 use App\Exceptions\DuplicateReadEntryException;
 use App\Models\Book;
 use App\Models\ReadEntry;
+use App\Services\Ai\EntryEmbedder;
+use App\Services\Ai\OllamaClient;
 use App\Support\AccountStats;
 use App\Support\BookSummary;
 use App\Support\LibraryEntry;
@@ -45,6 +47,8 @@ class ReadLogService
 
     private const PUBLIC_FEED_CACHE_SECONDS = 60;
 
+    public function __construct(private readonly EntryEmbedder $embedder) {}
+
     /**
      * @throws DuplicateReadEntryException when this user already logged this book on this date
      */
@@ -55,7 +59,7 @@ class ReadLogService
         try {
             // Wrapped in a savepoint when a transaction is already open (see
             // getOrCreateBook for why); a no-op at transaction level zero.
-            ReadEntry::query()->withSavepointIfNeeded(fn () => ReadEntry::create([
+            $entry = ReadEntry::query()->withSavepointIfNeeded(fn () => ReadEntry::create([
                 'user_id' => $userId,
                 'book_id' => $book->id,
                 'format' => $data->format,
@@ -80,6 +84,7 @@ class ReadLogService
         }
 
         $this->forgetPublicFeed(); // the public feed changed
+        $this->embedIfPossible($entry);
     }
 
     /**
@@ -197,8 +202,24 @@ class ReadLogService
         }
 
         $this->forgetPublicFeed();
+        $this->embedIfPossible($entry);
 
         return true;
+    }
+
+    /**
+     * Best-effort embedding after a write, for the "ask your library" search.
+     * Only attempted when the cached probe says Ollama is up, so a machine
+     * without it pays nothing on every save; a stale or missing embedding is
+     * filled in at the next search or by readlog:embed. Never throws.
+     */
+    private function embedIfPossible(ReadEntry $entry): void
+    {
+        if (! app(OllamaClient::class)->isAvailable()) {
+            return;
+        }
+
+        $this->embedder->embed($entry);
     }
 
     /**
