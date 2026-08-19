@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\DuplicateReadEntryException;
 use App\Http\Requests\UpdateReadEntryRequest;
 use App\Services\CurrentUser;
 use App\Services\ReadLogService;
@@ -39,11 +40,17 @@ class ReadEntryController extends Controller
 
     public function update(UpdateReadEntryRequest $request, int $entry): RedirectResponse
     {
-        $updated = $this->readLog->updateReadEntry(
-            $this->currentUser->id(),
-            $entry,
-            $request->toData(),
-        );
+        try {
+            $updated = $this->readLog->updateReadEntry(
+                $this->currentUser->id(),
+                $entry,
+                $request->toData(),
+            );
+        } catch (DuplicateReadEntryException) {
+            return back()
+                ->withInput()
+                ->withErrors(['form' => "You've already logged this book with that finished date."]);
+        }
 
         abort_if(! $updated, 404);
 
