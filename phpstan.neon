@@ -1,0 +1,20 @@
+# .NET counterpart: the analysers Directory.Build.props switches on, and above
+# all WarningsAsErrors=nullable, which made a possible null dereference a build
+# failure. PHP has no compiler to hang that on, so it is a separate tool and a
+# separate CI step. Larastan is PHPStan with knowledge of Laravel's magic
+# (facades, Eloquent attributes, the container), without which half the codebase
+# would be "unknown method on mixed".
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - config
+        - database
+        - routes
+    # Level 6 adds the checks a .NET developer misses most: parameter and return
+    # types everywhere, and nullability actually reasoned about. Level 7 and up
+    # start arguing about union types in ways that produce more annotations than
+    # findings for an app this size.
+    level: 6

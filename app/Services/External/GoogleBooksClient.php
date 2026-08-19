@@ -57,7 +57,9 @@ class GoogleBooksClient
         // element must not take the other results down with it, so non-array
         // items are skipped rather than allowed to raise a TypeError that
         // BookSearchService::settle would catch at the whole-response level.
-        return collect($response->json('items') ?? [])
+        $items = $response->json('items');
+
+        return collect(is_array($items) ? $items : [])
             ->filter(fn ($item) => is_array($item))
             ->map(fn (array $item) => $this->mapSearchResult($item))
             ->values();

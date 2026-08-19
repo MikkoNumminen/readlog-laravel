@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         if (Book::query()->exists()) {
-            $this->command?->info('Catalogue already populated; skipping the demo library. '
+            $this->command->info('Catalogue already populated; skipping the demo library. '
                 .'Run "php artisan db:seed --class=DemoLibrarySeeder" to seed it anyway.');
 
             return;

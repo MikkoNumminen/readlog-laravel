@@ -49,6 +49,11 @@ jobs:
       - name: Check formatting
         run: vendor/bin/pint --test
 
+      - name: Static analysis
+        # PHPStan via Larastan, level 6. The nearest thing PHP has to the
+        # WarningsAsErrors=nullable build the .NET version runs on.
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
       - name: Run migrations against a clean database
         run: |
           touch database/database.sqlite

@@ -26,7 +26,7 @@ class AccountController extends Controller
         $user = $this->currentUser->get();
 
         $displayName = $user->name;
-        $initialSource = $displayName !== null && $displayName !== '' ? $displayName : $user->email;
+        $initialSource = $displayName !== '' ? $displayName : $user->email;
 
         return view('account', [
             'stats' => $this->readLog->getAccountStats($user->id),

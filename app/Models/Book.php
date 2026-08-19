@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Database\Factories\BookFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A book in the shared catalogue: one row per real-world work, reused across every
@@ -18,6 +20,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * class IS the persistence gateway (Active Record), so Book::query(), $book->save()
  * and $book->readEntries all hang off the entity itself. There is no DbContext to
  * inject, and no change tracker deciding what to write.
+ *
+ * @property int $id
+ * @property string $title
+ * @property string|null $author
+ * @property string|null $cover_url
+ * @property string|null $open_library_id
+ * @property int|null $page_count
+ * @property int|null $first_publish_year
+ * @property Carbon $created_at
+ * @property-read Collection<int, ReadEntry> $readEntries
  */
 class Book extends Model
 {
