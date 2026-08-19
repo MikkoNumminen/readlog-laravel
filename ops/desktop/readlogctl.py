@@ -21,6 +21,8 @@ on the desktop.
     python ops/desktop/readlogctl.py logs         follow the app log
     python ops/desktop/readlogctl.py smoke        readlog:smoke inside the container
     python ops/desktop/readlogctl.py embed        readlog:embed (the AI search index)
+    python ops/desktop/readlogctl.py warm         load both Ollama models so the first question is fast
+    python ops/desktop/readlogctl.py ask "..."    ask the library from here
     python ops/desktop/readlogctl.py doctor       board plus versions and paths
 
 Settings come from the repo's .env, the same file compose reads: APP_PORT,
@@ -322,6 +324,31 @@ def do_on() -> int:
     rc, _ = compose("up", "-d", "--wait", "--wait-timeout", "240", timeout=900, capture=False)
     if rc != 0:
         print(c("  compose up failed; `docker compose logs app` has the reason.", "31"))
+        return rc
+    # Best effort, and only when Ollama answers: the first question on a cold
+    # GPU took 47 s, the next 3 s; paying that here, once, is what a demo wants.
+    if check_ollama(compose_services())[0] == "ok":
+        print("  == warming the AI models (a minute at most; skip with Ctrl-C) ==")
+        try:
+            compose("exec", "-T", "app", "php", "artisan", "readlog:ask", "--warm", timeout=300, capture=False)
+        except KeyboardInterrupt:
+            print("  (warm-up skipped)")
+    return 0
+
+
+def do_warm() -> int:
+    rc, _ = compose("exec", "-T", "app", "php", "artisan", "readlog:ask", "--warm", timeout=300, capture=False)
+    return rc
+
+
+def do_ask(question: str) -> int:
+    if question.strip() == "":
+        try:
+            question = input("  question > ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+    rc, _ = compose("exec", "-T", "app", "php", "artisan", "readlog:ask", question, timeout=300, capture=False)
     return rc
 
 
@@ -475,18 +502,22 @@ def do_watch() -> int:
 MENU = """  1) on        start the app                6) tunnel off  private again
   2) off       stop it (data stays)          7) smoke       readlog:smoke in the container
   3) open      app in the browser            8) embed       rebuild the AI search index
-  4) logs      follow the app log            w) watch       live board
-  5) tunnel on public URL for a demo         d) doctor      versions and paths
+  4) logs      follow the app log            9) warm        load the AI models now
+  5) tunnel on public URL for a demo         a) ask         ask the library a question
+  w) watch     live board                    d) doctor      versions and paths
   q) quit"""
 
 ALIASES = {
     "1": "on", "2": "off", "3": "open", "4": "logs", "5": "tunnel on", "6": "tunnel off",
-    "7": "smoke", "8": "embed", "w": "watch", "d": "doctor", "s": "status", "q": "quit",
+    "7": "smoke", "8": "embed", "9": "warm", "a": "ask", "w": "watch", "d": "doctor", "s": "status", "q": "quit",
     "up": "on", "down": "off", "start": "on", "stop": "off", "exit": "quit",
 }
 
 
 def dispatch(command: str) -> int:
+    word, _, rest = command.strip().partition(" ")
+    if word.lower() == "ask":
+        return do_ask(rest.strip().strip('"'))
     command = ALIASES.get(command.strip().lower(), command.strip().lower())
     rc = act(command)
     if command in ("on", "off", "tunnel on", "tunnel off", "doctor"):
@@ -508,6 +539,10 @@ def act(command: str) -> int:
             return do_smoke()
         case "embed":
             return do_embed()
+        case "warm":
+            return do_warm()
+        case "ask":
+            return do_ask("")
         case "tunnel on":
             return do_tunnel_on()
         case "tunnel off":

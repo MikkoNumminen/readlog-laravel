@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\Format;
+use App\Models\ReadEntry;
 use Carbon\CarbonImmutable;
 
 /**
@@ -19,4 +20,20 @@ final readonly class LibraryEntry
         public ?int $rating,
         public BookSummary $book,
     ) {}
+
+    /** The entry must have its book loaded. */
+    public static function fromModel(ReadEntry $entry): self
+    {
+        return new self(
+            id: $entry->id,
+            format: $entry->format,
+            finishedAt: $entry->finished_at,
+            rating: $entry->rating,
+            book: new BookSummary(
+                title: $entry->book->title,
+                author: $entry->book->author,
+                coverUrl: $entry->book->cover_url,
+            ),
+        );
+    }
 }

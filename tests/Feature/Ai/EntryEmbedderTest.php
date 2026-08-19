@@ -78,7 +78,8 @@ it('embeds on write when Ollama is up, and skips unchanged entries after that', 
     $stored = ReadEntryEmbedding::query()->where('read_entry_id', $entry->id)->firstOrFail();
     expect($stored->model)->toBe('nomic-embed-text')
         ->and($stored->dimensions)->toBe(2)
-        ->and($stored->vector)->toBe([(float) strlen(embedder()->textFor($entry)), 1.0]);
+        // What was embedded is the document prefix plus the entry text.
+        ->and($stored->vector)->toBe([(float) strlen('search_document: '.embedder()->textFor($entry)), 1.0]);
 
     Http::assertSentCount(2); // one probe, one embed
     expect(embedder()->embed($entry))->toBeTrue();

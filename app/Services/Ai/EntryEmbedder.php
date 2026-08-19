@@ -84,11 +84,14 @@ class EntryEmbedder
 
         $entries->loadMissing(['book', 'embedding']);
         $model = $this->ollama->embedModel();
+        $prefix = (string) config('services.ollama.embed_document_prefix');
 
         /** @var list<array{entry: ReadEntry, text: string, hash: string}> $stale */
         $stale = [];
         foreach ($entries as $entry) {
-            $text = $this->textFor($entry);
+            // The prefix is part of what was embedded, so it is part of the hash:
+            // change it and every entry is stale, which is right.
+            $text = $prefix.$this->textFor($entry);
             $hash = hash('sha256', $text);
             $current = $entry->embedding;
 

@@ -9,7 +9,6 @@ use App\Models\ReadEntry;
 use App\Services\Ai\EntryEmbedder;
 use App\Services\Ai\OllamaClient;
 use App\Support\AccountStats;
-use App\Support\BookSummary;
 use App\Support\LibraryEntry;
 use App\Support\LogBookData;
 use App\Support\PublicRead;
@@ -361,17 +360,7 @@ class ReadLogService
 
     private function toLibraryEntry(ReadEntry $entry): LibraryEntry
     {
-        return new LibraryEntry(
-            id: $entry->id,
-            format: $entry->format,
-            finishedAt: $entry->finished_at,
-            rating: $entry->rating,
-            book: new BookSummary(
-                title: $entry->book->title,
-                author: $entry->book->author,
-                coverUrl: $entry->book->cover_url,
-            ),
-        );
+        return LibraryEntry::fromModel($entry);
     }
 
     /**
