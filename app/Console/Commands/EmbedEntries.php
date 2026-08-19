@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\OllamaUnavailableException;
 use App\Models\ReadEntry;
 use App\Models\ReadEntryEmbedding;
 use App\Services\Ai\EntryEmbedder;
@@ -48,13 +49,25 @@ class EmbedEntries extends Command
 
         $embedded = 0;
         $seen = 0;
-        ReadEntry::query()->with(['book', 'embedding'])->orderBy('id')
-            ->chunkById(max(1, (int) $this->option('chunk')), function ($entries) use (&$embedded, &$seen, $embedder) {
-                $seen += $entries->count();
-                $embedded += $embedder->embedMany($entries);
-            });
+        // Long timeout on purpose: the first request after a while has to load
+        // the model, which is exactly the case a backfill should absorb rather
+        // than fail on.
+        $timeout = (int) config('services.ollama.backfill_embed_timeout');
 
-        $this->components->info("{$seen} entries seen, {$embedded} embedded with {$ollama->embedModel()}; the rest were already current.");
+        try {
+            ReadEntry::query()->with(['book', 'embedding'])->orderBy('id')
+                ->chunkById(max(1, (int) $this->option('chunk')), function ($entries) use (&$embedded, &$seen, $embedder, $timeout) {
+                    $seen += $entries->count();
+                    $embedded += $embedder->embedMany($entries, $timeout);
+                });
+        } catch (OllamaUnavailableException $e) {
+            $this->components->error("Stopped after {$embedded} embedded: {$e->getMessage()}");
+
+            return self::FAILURE;
+        }
+
+        $current = $seen - $embedded;
+        $this->components->info("{$seen} entries seen, {$embedded} embedded with {$ollama->embedModel()}, {$current} already current.");
 
         return self::SUCCESS;
     }

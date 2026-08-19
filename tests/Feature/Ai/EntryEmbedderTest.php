@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Format;
+use App\Exceptions\OllamaUnavailableException;
 use App\Models\ReadEntry;
 use App\Models\ReadEntryEmbedding;
 use App\Models\User;
@@ -8,6 +9,7 @@ use App\Services\Ai\EntryEmbedder;
 use App\Services\ReadLogService;
 use App\Support\LogBookData;
 use App\Support\UpdateReadEntryData;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
@@ -117,6 +119,9 @@ it('saves the entry even when Ollama dies mid-write, and leaves the gap to fill 
     expect($entry->exists)->toBeTrue()
         ->and(ReadEntryEmbedding::query()->count())->toBe(0)
         ->and(embedder()->embed($entry))->toBeFalse();
+
+    // The batch API is the one that tells the caller.
+    expect(fn () => embedder()->embedMany(new Collection([$entry])))->toThrow(OllamaUnavailableException::class);
 });
 
 it('probes once when Ollama is unreachable, then stops trying', function () {
@@ -164,8 +169,16 @@ it('backfills missing embeddings in one request per chunk with readlog:embed', f
     Http::assertSentCount(3); // probe + two chunks
 
     $this->artisan('readlog:embed')->expectsOutputToContain('0 embedded')->assertSuccessful();
+
     $this->artisan('readlog:embed', ['--fresh' => true])->expectsOutputToContain('Dropped 3')->assertSuccessful();
     expect(ReadEntryEmbedding::query()->count())->toBe(3);
+
+    // Ollama dying half way through a backfill is reported as a failure, not as
+    // "done". Last in this test: Http::fake invokes every matching stub, so a
+    // throwing one cannot be un-registered by a later fake().
+    Http::fake([OLLAMA_HOST.'/api/embed' => fn () => throw new ConnectionException('gone')]);
+    config()->set('services.ollama.embed_model', 'model-b');
+    $this->artisan('readlog:embed')->expectsOutputToContain('Stopped after 0 embedded')->assertFailed();
 });
 
 it('readlog:embed fails clearly when Ollama is not reachable', function () {

@@ -88,11 +88,12 @@ class OllamaClient
      * Embeds one or more texts with the configured embedding model.
      *
      * @param  list<string>  $texts
+     * @param  int|null  $timeout  seconds; null means the configured embed_timeout
      * @return list<list<float>> one vector per input text, in order
      *
      * @throws OllamaUnavailableException
      */
-    public function embed(array $texts): array
+    public function embed(array $texts, ?int $timeout = null): array
     {
         if ($texts === []) {
             return [];
@@ -101,7 +102,7 @@ class OllamaClient
         $response = $this->post('/api/embed', [
             'model' => $this->embedModel(),
             'input' => $texts,
-        ], (int) config('services.ollama.embed_timeout'));
+        ], $timeout ?? (int) config('services.ollama.embed_timeout'));
 
         $vectors = $response->json('embeddings');
 

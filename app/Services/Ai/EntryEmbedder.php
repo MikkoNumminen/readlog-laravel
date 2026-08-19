@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Log;
  * Embeddings are best effort by design. Writing an entry never fails because
  * Ollama is down: the entry is saved, the embedding is skipped, and the next
  * search or the readlog:embed command fills the gap. That is the "app never
- * depends on it" rule from TODO.md made concrete.
+ * depends on it" rule from TODO.md made concrete. embed() is that write path
+ * and swallows the failure; embedMany() is for callers that want to know.
  */
 class EntryEmbedder
 {
@@ -49,22 +50,33 @@ class EntryEmbedder
     }
 
     /**
-     * Embeds one entry, if its stored embedding is missing or stale. Returns
-     * whether an embedding now exists for it.
+     * Embeds one entry, if its stored embedding is missing or stale, and never
+     * throws: this is the write path, where the entry has already been saved
+     * and Ollama being slow or absent must cost the reader nothing but a log
+     * line. Uses the short write timeout. Returns whether an embedding now
+     * exists for the entry.
      */
     public function embed(ReadEntry $entry): bool
     {
-        return $this->embedMany(new Collection([$entry])) === 1 || $entry->embedding()->exists();
+        try {
+            $this->embedMany(new Collection([$entry]), (int) config('services.ollama.write_embed_timeout'));
+        } catch (OllamaUnavailableException $e) {
+            Log::info('Skipping embedding after write; Ollama unavailable.', ['entry' => $entry->id, 'reason' => $e->getMessage()]);
+        }
+
+        return $entry->embedding()->exists();
     }
 
     /**
      * Embeds every entry in the collection whose embedding is missing or stale,
-     * in one request to Ollama. Returns how many were (re)embedded. Never
-     * throws for an unreachable Ollama; that case returns 0 and is logged once.
+     * in one request to Ollama. Returns how many were (re)embedded.
      *
      * @param  Collection<int, ReadEntry>  $entries
+     * @param  int|null  $timeout  seconds for the Ollama call; null means the configured default
+     *
+     * @throws OllamaUnavailableException when the request could not be made or answered
      */
-    public function embedMany(Collection $entries): int
+    public function embedMany(Collection $entries, ?int $timeout = null): int
     {
         if (! $this->ollama->enabled() || $entries->isEmpty()) {
             return 0;
@@ -91,13 +103,7 @@ class EntryEmbedder
             return 0;
         }
 
-        try {
-            $vectors = $this->ollama->embed(array_map(fn (array $s) => $s['text'], $stale));
-        } catch (OllamaUnavailableException $e) {
-            Log::info('Skipping embeddings; Ollama unavailable.', ['reason' => $e->getMessage(), 'entries' => count($stale)]);
-
-            return 0;
-        }
+        $vectors = $this->ollama->embed(array_map(fn (array $s) => $s['text'], $stale), $timeout);
 
         foreach ($stale as $i => $item) {
             $vector = $vectors[$i] ?? [];

@@ -85,6 +85,12 @@ return [
         'probe_timeout' => (int) env('OLLAMA_PROBE_TIMEOUT', 2),
         'embed_timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 20),
         'generate_timeout' => (int) env('OLLAMA_GENERATE_TIMEOUT', 45),
+        // Embedding one entry right after it is saved: short, because a cold
+        // model can take half a minute to load and a save must not wait for it.
+        // A missed embedding is filled in at the next search or by readlog:embed,
+        // which uses the long timeout below precisely so it can absorb that load.
+        'write_embed_timeout' => (int) env('OLLAMA_WRITE_EMBED_TIMEOUT', 5),
+        'backfill_embed_timeout' => (int) env('OLLAMA_BACKFILL_EMBED_TIMEOUT', 120),
         // How long a successful or failed probe is trusted before asking again.
         'probe_cache_seconds' => (int) env('OLLAMA_PROBE_CACHE', 60),
     ],
