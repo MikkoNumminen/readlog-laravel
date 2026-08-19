@@ -3,7 +3,11 @@
 A book and reading tracker: search for books across Open Library and Google Books,
 log what you finish with a format (book, audiobook or e-book), a finished-on date
 and a 0 to 5 star rating, then browse, search, edit and delete your library. There
-is an account page with reading stats and a public "recently read" feed.
+is an account page with reading stats and a public "recently read" feed. And one
+thing the original does not have: you can ask your library a question in plain
+words ("audiobooks I rated 5 last year", "the one about a desert planet") and a
+model running on your own machine answers from your entries; see
+[Ask your library](#ask-your-library).
 
 **Live site:** <https://mikkonumminen.dev/readlog-laravel>, a static snapshot of
 the seeded library served from the author's portfolio (details under
@@ -40,9 +44,10 @@ application, so this is the second port of the same behaviour.
 ## Status
 
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
-library search, and the multi-source lookup with its merge logic. 222 passing
-tests plus 3 live-API tests that are skipped by default, run against both SQLite
-and Postgres in CI. **There is no authentication**, deliberately, and the app
+library search, and the multi-source lookup with its merge logic, plus the
+"ask your library" search over a local Ollama, which degrades to the title search
+when Ollama is absent. 308 passing tests plus 3 live-API tests that are skipped
+by default, run against both SQLite and Postgres in CI, with PHPStan level 6. **There is no authentication**, deliberately, and the app
 ships a demo reader switcher in its place; see STATUS.md for that and for the
 other known gaps.
 
@@ -131,6 +136,47 @@ php artisan serve
 Then open <http://localhost:8000>. `composer setup` runs everything except the
 last line.
 
+## Ask your library
+
+The library page has a second search box. Type a question the way you would say
+it and a model running on your machine answers from your own entries: which
+books, when, what format, what rating. Nothing leaves the machine and nothing
+about it is required: without Ollama the box answers with the plain title search
+and a one-line notice saying so.
+
+It is built as three layers, each allowed to fail downward, which is the rule
+[TODO.md](TODO.md) set for it before it existed:
+
+1. **Exact filters first.** Format words, ratings ("rated 5", "4 or more",
+   "unrated") and years ("in 2024", "last year") are pulled out of the question
+   with plain patterns and become `WHERE` clauses. The model is only ever shown
+   entries that already satisfy them.
+2. **Embeddings rank the rest.** Each entry is one short text (title, author,
+   format, rating, dates, year, pages), embedded once by `nomic-embed-text` and
+   stored as a JSON column; the question is embedded the same way and cosine in
+   PHP picks the closest few. A few hundred entries is well under a millisecond.
+3. **A small chat model phrases the answer** (`qwen2.5:7b` by default) from
+   those few entries only, as JSON with the ids it relied on. Ids it was not
+   shown are dropped, so it can only cite what it saw. The entries it saw but did
+   not cite stay visible under the answer, so a miss is a miss you can see.
+
+What it knows is what the log knows. "The one about a desert planet" finds Dune
+because the model has heard of Dune; "the science one about a man alone in
+space" is answered honestly with "none of these", because nothing in the log
+says what Project Hail Mary is about.
+
+```bash
+ollama pull nomic-embed-text && ollama pull qwen2.5:7b   # once
+php artisan readlog:embed                                # index an existing library
+php artisan readlog:ask "audiobooks I rated 5 last year" # from the command line
+php artisan readlog:ask --warm                           # load both models before a demo
+```
+
+Writes embed the changed entry when Ollama is up; the first question after a
+while can take half a minute while the models load (measured: 47 s cold, 0.5 to
+4 s warm), which is what `--warm` and the desktop control's start-up are for.
+`OLLAMA_URL`, `AI_SEARCH_ENABLED` and the model names are in the table below.
+
 ## Running the tests
 
 ```bash
@@ -162,7 +208,7 @@ Everything has a working default. The two settings worth knowing:
 | `BOOK_SEARCH_LIVE_TESTS` | Lets the tests tagged `live` call the real APIs. Off by default. |
 | `DB_CONNECTION` and `DB_*` | `sqlite` by default. Set `pgsql` plus host, port, database, user, password and `DB_SSLMODE` for any standard PostgreSQL; `.env.example` lists them. |
 | `TRUSTED_PROXIES` | Which upstream to believe about the original scheme and host. `*` inside compose; `127.0.0.1` for a local `cloudflared` in front of `php artisan serve`. Unset means forwarded headers are ignored. |
-| `OLLAMA_URL` and `AI_SEARCH_ENABLED` | Where a local [Ollama](https://ollama.com) answers, for the "ask your library" search. Default `http://localhost:11434` (`host.docker.internal` inside compose), on. Unreachable is fine: the search falls back to title matching and says so. `php artisan readlog:embed` backfills the embeddings for an existing library. |
+| `OLLAMA_URL` and `AI_SEARCH_ENABLED` | Where a local [Ollama](https://ollama.com) answers, for the "ask your library" search. Default `http://localhost:11434` (`host.docker.internal` inside compose), on. Unreachable is fine: the search falls back to title matching and says so. `php artisan readlog:embed` backfills the embeddings for an existing library. When Ollama is another compose project's container, set `OLLAMA_DOCKER_NETWORK` and add `-f compose.ollama.yaml`. |
 
 `php artisan readlog:smoke [--url=...]` checks a running instance: health route,
 home page, database, migrations, demo data, providers.

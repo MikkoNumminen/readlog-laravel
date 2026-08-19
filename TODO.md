@@ -1,52 +1,32 @@
 # TODO
 
-Recorded, not implemented. Nothing in this file is in the codebase.
+Recorded, not implemented, apart from the first section, which records what
+was built and what of it is left.
 
-## AI-assisted natural-language search over your own library
+## AI-assisted natural-language search: done
 
-The one feature worth building next, and the reason the rest of this file is
-short.
+Built in PRs 16, 18 and 19 as "ask your library"; README.md describes it and
+DECISIONS.md #94 to #103 record the choices. It kept the shape this file asked
+for: a deterministic layer in front of the model, embeddings over the entries
+in a plain table with cosine in PHP, a small local model that only phrases what
+was retrieved and can only cite what it was shown, and a fallback to the title
+search with a one-line notice when Ollama is absent.
 
-**What it does.** Ask the library a question in ordinary language instead of
-matching a title substring. "That Finnish book about a lighthouse I read a couple
-of summers ago." "The audiobooks I gave five stars." "Something like Piranesi but
-shorter." Today `ReadLogService::checkIfRead()` can only answer "does any title I
-have logged contain this string", which is the whole of what readlog-dotnet does
-too.
+What is left of it, recorded rather than built:
 
-**How it would work.**
-
-- Laravel calls a local [Ollama](https://ollama.com/) instance over HTTP on
-  localhost. No cloud, no key, no per-token cost, nothing leaving the machine.
-- Embeddings over books and reading entries, stored in a new table alongside them
-  and recomputed on write. With a library of a few hundred books, brute-force
-  cosine similarity in PHP is fast enough, so no vector extension is needed.
-- The natural-language query is embedded the same way, the nearest entries are
-  retrieved, and a small local model turns them into an answer that cites the
-  entries it used.
-
-**The two-layer principle.** This follows the same
-shape as the author's
-[feedback-intelligence](https://github.com/MikkoNumminen/feedback-intelligence)
-project: a deterministic layer in front of a model, never a model in front of the
-data.
-
-- Layer one is the existing SQL. Filters that can be expressed exactly (format,
-  rating, date range, title match) are executed as queries, not inferred.
-- Layer two is the model, and it only ever ranks or phrases what layer one
-  retrieved. It is not allowed to invent a book, and every result it returns has
-  to correspond to a real `read_entries` row.
-
-**Degrading cleanly is a hard requirement.** The app must never depend on Ollama.
-If it is not running, not installed, slow, or returns something unusable, the
-search box falls back to the existing `checkIfRead()` behaviour and says so in one
-line of text. That is the same rule `BookSearchService` already follows for Open
-Library and Google Books, and there is precedent in this repository for testing
-it: fake the transport, force the failure, assert the fallback.
-
-**Why it is not in version 1.** It is a feature readlog-dotnet does not have, and
-version 1 was scoped as a faithful port. Building it first would have made the
-comparison in MIGRATION.md dishonest.
+- **Descriptions in the embeddings.** An entry is embedded from title, author,
+  format, rating and dates. That is enough for "the one about a desert planet"
+  only because the model has heard of Dune. Storing the Google Books description
+  on the book (it is fetched for the detail page and thrown away) and embedding
+  it would let "a man alone in space" find Project Hail Mary. Cheap, and the next
+  thing to do here.
+- **Relative dates finer than a year.** "Last summer", "this spring", "in
+  March" are not parsed; the embedding sees "Finished on June 5, 2026" and often
+  gets it right anyway. A parser for seasons and months is thirty lines and a
+  dozen test rows.
+- **A streaming answer.** The page waits for the whole answer. Fine at 0.5 to 4
+  seconds warm; a first cold question can take half a minute, which the warm-up
+  covers but a streamed response would show.
 
 ## AI candidates considered and parked
 

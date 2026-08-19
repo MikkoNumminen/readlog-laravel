@@ -11,6 +11,11 @@ to Laravel 13 is **complete for version 1 scope**. Every feature in that scope i
 implemented and tested, the app runs from a clean clone with one Docker command
 (or four PHP ones), and the test suite is green on SQLite and on Postgres.
 
+**Beyond the port**, one feature: "ask your library", a natural-language search
+over the reader's own entries answered by a local Ollama, degrading to the title
+search when Ollama is absent (PRs 16, 18, 19). And a desktop control panel for
+the locally hosted app (PR 17).
+
 **Hosting**: the app runs locally on the author's machine and is put on a public
 URL only on demand, through a Cloudflare quick tunnel, for the length of a demo.
 There is no hosted copy. Cloud deployment was worked on and then dropped as a
@@ -24,8 +29,7 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-222 passing tests, 3 skipped (live API), 562 assertions, on SQLite and on Postgres 16
-35 PHP files in app/, 13 Blade views, 20 test files
+308 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
 ```
 
 ## What each pull request contains
@@ -134,6 +138,26 @@ headers Cloudflare's edge adds and asserts https links and a Secure cookie.
 Self-review found the scripts committed without their executable bit (Git on
 Windows does not record it), a stale `.tunnel-url` that could have been copied
 into the image, and three tests that were wrong when first written.
+
+### Pull requests 8 to 19, in one table
+
+Later runs were smaller and are recorded here in one line each; every PR carries
+its own self-review.
+
+| PR | What |
+| --- | --- |
+| [8](https://github.com/MikkoNumminen/readlog-laravel/pull/8) | Docs close-out for the local-hosting decision; hosting kept as an open question. |
+| [9](https://github.com/MikkoNumminen/readlog-laravel/pull/9) | Review pass over PRs 1 to 8: fifteen verified findings fixed. |
+| [10](https://github.com/MikkoNumminen/readlog-laravel/pull/10) | `readlog:snapshot`: a static, browsable copy of the seeded app, published under the portfolio at /readlog-laravel. |
+| [11](https://github.com/MikkoNumminen/readlog-laravel/pull/11) | README: link the snapshot and say what it does and does not do. |
+| [12](https://github.com/MikkoNumminen/readlog-laravel/pull/12) | Review of the snapshot generator: five findings fixed (a second run in one process wrote nothing; `--out=.` would have deleted the repo). |
+| [13](https://github.com/MikkoNumminen/readlog-laravel/pull/13) | Docs: the tunnel verified end to end by hand. |
+| [14](https://github.com/MikkoNumminen/readlog-laravel/pull/14) | Editing an entry onto an occupied date shows a message instead of a 500 (a ported hole, closed). |
+| [15](https://github.com/MikkoNumminen/readlog-laravel/pull/15) | PHPStan via Larastan at level 6, in CI. |
+| [16](https://github.com/MikkoNumminen/readlog-laravel/pull/16) | AI search 1/3: `OllamaClient`, one embedding per entry, `readlog:embed`, best-effort embedding on write. |
+| [17](https://github.com/MikkoNumminen/readlog-laravel/pull/17) | ReadLog Control: a desktop panel (status board, on, off, tunnel on and off, smoke, embed, warm, ask). |
+| [18](https://github.com/MikkoNumminen/readlog-laravel/pull/18) | AI search 2/3: "ask your library", three layers, degrading to the title search. |
+| [19](https://github.com/MikkoNumminen/readlog-laravel/pull/19) | AI search 3/3: documentation, this table, TODO.md trimmed. |
 
 ## Hosting: what is automated and what is manual
 
@@ -251,11 +275,13 @@ persistence beyond the storage volume, a deploy pipeline).
 
 ### AI features
 
-Nothing AI-assisted is implemented. The natural-language library search, the
-recommendation idea and the LLM-assisted metadata merge are all recorded in
-TODO.md with the reasoning for parking each. Building any of them in version 1
-would have made the comparison in MIGRATION.md dishonest, because readlog-dotnet
-has no counterpart to compare against.
+"Ask your library" is implemented (README has the description, DECISIONS.md
+#94 to #103 the reasoning). It was built after version 1 was closed and
+compared, so the comparison in MIGRATION.md stays honest: it is called out
+there as the one thing with no .NET counterpart. What the model knows is what
+the log knows, title and author and the entry's own facts, so questions about
+plot only work for books the model has heard of. The recommendation idea and
+the LLM-assisted metadata merge remain parked in TODO.md.
 
 ## Known rough edges
 
@@ -287,6 +313,9 @@ docker compose -f compose.yaml -f compose.postgres.yaml up -d --wait
 docker compose exec app php artisan readlog:smoke --url=http://web
                                         # 6 PASS, 1 WARN (no Google key)
 ```
+
+As of PR 19 the same commands give 308 passed, 3 skipped, on both databases, and
+`composer analyse` (PHPStan level 6) is clean; CI runs all of it on every push.
 
 Plus a manual pass over every route with `php artisan serve` and again through
 nginx in compose: every page returns 200 except the intended 404s, the security

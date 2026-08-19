@@ -426,6 +426,27 @@ with the model.
   Azure probe.
 - The full list, with reasoning, is in [DECISIONS.md](DECISIONS.md).
 
+## What was added, and has no counterpart
+
+**"Ask your library"** (`app/Services/Ai/`, PRs 16 and 18) is the one feature
+in this codebase with nothing to map to in readlog-dotnet, built after version 1
+was closed so that everything above stays a comparison of like with like. It is
+a natural-language search over the reader's own entries: exact filters parsed
+from the question, embeddings ranking the rest, a small local model phrasing an
+answer over what was retrieved, all through a local Ollama, all optional. The
+mapping table for it would be one row: `LibraryAsk` and friends on the left,
+nothing on the right. README.md describes it and DECISIONS.md #94 to #103 carry
+the choices, including the measured reason the timeouts are what they are.
+
+One thing from building it belongs in this document. The pieces it needed were
+all already in the codebase because of the port: the typed HTTP client shape
+from the provider clients, the "fake the transport, force the failure, assert
+the fallback" test pattern, the portable-SQL habit (`whereYear` instead of a
+dialect function, a JSON text column instead of pgvector), and the exception
+type per dependency. A feature the .NET version does not have was the easiest
+one to write, because the port had already decided how the codebase treats an
+optional external service.
+
 ## How AI assistance was used, and where it was wrong
 
 The whole migration was done with an AI coding agent (Claude Code) driving, with
