@@ -6,6 +6,7 @@ use App\Exceptions\OllamaUnavailableException;
 use App\Models\ReadEntry;
 use App\Models\ReadEntryEmbedding;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -115,15 +116,21 @@ class EntryEmbedder
                 continue;
             }
 
-            ReadEntryEmbedding::query()->updateOrCreate(
-                ['read_entry_id' => $item['entry']->id],
-                [
-                    'model' => $model,
-                    'dimensions' => count($vector),
-                    'content_hash' => $item['hash'],
-                    'vector' => $vector,
-                ],
-            );
+            try {
+                ReadEntryEmbedding::query()->updateOrCreate(
+                    ['read_entry_id' => $item['entry']->id],
+                    [
+                        'model' => $model,
+                        'dimensions' => count($vector),
+                        'content_hash' => $item['hash'],
+                        'vector' => $vector,
+                    ],
+                );
+            } catch (UniqueConstraintViolationException) {
+                // Two requests embedded the same entry at once (a slow first ask
+                // resubmitted in another tab, or a save overlapping an ask). The
+                // other one won; its row is as good as ours.
+            }
 
             $item['entry']->unsetRelation('embedding');
         }

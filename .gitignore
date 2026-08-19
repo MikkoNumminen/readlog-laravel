@@ -40,3 +40,7 @@ Thumbs.db
 
 # Written by ops/desktop/readlogctl.py for a natively run cloudflared
 .tunnel.pid
+
+# Python bytecode from ops/desktop/readlogctl.py
+__pycache__/
+*.pyc

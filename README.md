@@ -46,7 +46,7 @@ application, so this is the second port of the same behaviour.
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
 library search, and the multi-source lookup with its merge logic, plus the
 "ask your library" search over a local Ollama, which degrades to the title search
-when Ollama is absent. 308 passing tests plus 3 live-API tests that are skipped
+when Ollama is absent. 326 passing tests plus 3 live-API tests that are skipped
 by default, run against both SQLite and Postgres in CI, with PHPStan level 6. **There is no authentication**, deliberately, and the app
 ships a demo reader switcher in its place; see STATUS.md for that and for the
 other known gaps.

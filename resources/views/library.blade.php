@@ -43,7 +43,7 @@
             @if ($askResult !== null)
                 @if ($askResult->unavailable)
                     <p class="rl-muted rl-notice">
-                        AI search is unavailable ({{ $askResult->reason }}) Showing title matches instead.
+                        AI search is unavailable: {{ $askResult->reason }} Showing title matches instead.
                     </p>
                     @if ($askFallback->isEmpty())
                         <p class="rl-muted">Not in your library.</p>
@@ -92,9 +92,9 @@
     @else
         <div class="rl-row" style="justify-content: flex-end; margin-bottom: 0.5rem">
             <a class="rl-btn rl-btn-sm @if ($view !== 'grid') rl-btn-outline @endif"
-               href="{{ route('library.index', array_filter(['view' => 'grid', 'q' => $query, 'ask' => $ask])) }}">Grid</a>
+               href="{{ route('library.index', array_filter(['view' => 'grid', 'q' => $query])) }}">Grid</a>
             <a class="rl-btn rl-btn-sm @if ($view !== 'list') rl-btn-outline @endif"
-               href="{{ route('library.index', array_filter(['view' => 'list', 'q' => $query, 'ask' => $ask])) }}">List</a>
+               href="{{ route('library.index', array_filter(['view' => 'list', 'q' => $query])) }}">List</a>
         </div>
 
         @if ($view === 'list')

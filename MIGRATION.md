@@ -435,7 +435,7 @@ a natural-language search over the reader's own entries: exact filters parsed
 from the question, embeddings ranking the rest, a small local model phrasing an
 answer over what was retrieved, all through a local Ollama, all optional. The
 mapping table for it would be one row: `LibraryAsk` and friends on the left,
-nothing on the right. README.md describes it and DECISIONS.md #94 to #103 carry
+nothing on the right. README.md describes it and DECISIONS.md #94 to #108 carry
 the choices, including the measured reason the timeouts are what they are.
 
 One thing from building it belongs in this document. The pieces it needed were

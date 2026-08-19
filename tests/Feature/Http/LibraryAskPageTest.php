@@ -94,12 +94,46 @@ it('ignores an empty question and never calls Ollama for it', function () {
     Http::assertNothingSent();
 });
 
-it('carries the question through the grid and list toggle', function () {
+it('caps the question length before it reaches Ollama', function () {
+    $user = User::factory()->create();
+    shelfWithDune($user);
+    $seen = [];
+    Http::fake([
+        PAGE_OLLAMA.'/api/tags' => Http::response(['models' => []]),
+        PAGE_OLLAMA.'/api/embed' => function ($request) use (&$seen) {
+            $seen = array_merge($seen, $request['input']);
+
+            return Http::response(['embeddings' => array_fill(0, count($request['input']), [1.0, 0.0])]);
+        },
+        PAGE_OLLAMA.'/api/generate' => Http::response(['response' => json_encode(['answer' => 'ok', 'cited' => []])]),
+    ]);
+
+    actingAsReader($user)->get('/library?ask='.str_repeat('a', 2000))->assertOk();
+
+    $question = collect($seen)->first(fn (string $t) => str_starts_with($t, 'search_query: '));
+    expect(mb_strlen($question))->toBe(mb_strlen('search_query: ') + 400);
+});
+
+it('does not carry the question through the grid and list toggle, which would ask the model again', function () {
     $user = User::factory()->create();
     shelfWithDune($user);
     Http::fake([PAGE_OLLAMA.'/api/tags' => fn () => throw new ConnectionException('refused')]);
 
     actingAsReader($user)->get('/library?ask=dune')
         ->assertOk()
-        ->assertSee('view=list&amp;ask=dune', false);
+        ->assertSee('href="http://localhost:8000/library?view=list"', false)
+        ->assertDontSee('ask=dune"', false);
+});
+
+it('throttles questions per address but not plain library visits', function () {
+    $user = User::factory()->create();
+    shelfWithDune($user);
+    Http::fake([PAGE_OLLAMA.'/api/tags' => fn () => throw new ConnectionException('refused')]);
+
+    foreach (range(1, 10) as $i) {
+        actingAsReader($user)->get('/library?ask=q'.$i)->assertOk();
+    }
+    actingAsReader($user)->get('/library?ask=one-too-many')->assertStatus(429);
+    actingAsReader($user)->get('/library')->assertOk();
+    actingAsReader($user)->get('/library?q=dune')->assertOk();
 });

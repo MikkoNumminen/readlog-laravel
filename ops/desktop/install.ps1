@@ -21,10 +21,14 @@ $s.Save()
 Write-Host "shortcut: $lnk"
 
 $exe = Join-Path $env:LOCALAPPDATA 'Programs\cloudflared\cloudflared.exe'
+$imagePresent = $false
+try { docker image inspect cloudflare/cloudflared:latest *> $null; $imagePresent = ($LASTEXITCODE -eq 0) } catch {}
 if (Get-Command cloudflared -ErrorAction SilentlyContinue) {
     Write-Host "cloudflared: already on PATH"
 } elseif (Test-Path $exe) {
     Write-Host "cloudflared: $exe"
+} elseif ($imagePresent) {
+    Write-Host "cloudflared: the Docker image is present; the control uses the compose profile, no download needed"
 } else {
     New-Item -ItemType Directory -Force (Split-Path $exe) | Out-Null
     $url = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe'

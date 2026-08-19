@@ -18,9 +18,11 @@ use Illuminate\Database\Eloquent\Builder;
  * shown entries that already satisfy the hard constraints.
  *
  * Deliberately small. No author or title parsing (the embeddings handle names
- * well), no relative dates finer than a year, no ranges beyond "at least N".
- * A pattern that misfires would silently hide entries, so each one here is a
- * phrase a person actually types, and each is pinned by a test.
+ * well), no relative dates finer than a year, no ranges beyond "at least N" and
+ * "since a year". A pattern that misfires would silently hide entries, so each
+ * one here needs a rating word or a date word next to the number ("at least 4
+ * stars", not "at least 4 books"), each is a phrase a person actually types,
+ * and each is pinned by a test, the misses included.
  */
 final readonly class LibraryQuestion
 {
@@ -34,6 +36,7 @@ final readonly class LibraryQuestion
         public ?int $ratingMin,
         public bool $unrated,
         public ?int $year,
+        public ?int $yearFrom,
         public array $applied,
     ) {}
 
@@ -43,18 +46,22 @@ final readonly class LibraryQuestion
         $q = ' '.mb_strtolower(trim($question)).' ';
         $applied = [];
 
+        // Format. "books" alone is not a format (it means entries); "print" alone
+        // is not either ("first printed in 1965" is about the book, not the copy).
         $format = null;
         if (preg_match('/\b(audio ?books?|audio)\b/u', $q)) {
             $format = Format::Audiobook;
         } elseif (preg_match('/\b(e-?books?|ebooks?|kindle)\b/u', $q)) {
             $format = Format::Ebook;
-        } elseif (preg_match('/\b(paper ?backs?|hard ?covers?|print(ed)?|physical|paper books?)\b/u', $q)) {
+        } elseif (preg_match('/\b(paper ?backs?|hard ?covers?|hardbacks?|physical|paper books?|print books?|printed books?|in print)\b/u', $q)) {
             $format = Format::Book;
         }
         if ($format !== null) {
             $applied[] = strtolower($format->pluralLabel());
         }
 
+        // Rating. Every pattern needs a rating word next to the number, so that
+        // "at least 4 books" and "over 3 weeks" are not ratings.
         $ratingExact = null;
         $ratingMin = null;
         $unrated = false;
@@ -62,22 +69,29 @@ final readonly class LibraryQuestion
         if (preg_match("/\\b(unrated|not rated|without a rating|no rating|not rate|didn'?t rate|did not rate|haven'?t rated|never rated|no stars)\\b/u", $q)) {
             $unrated = true;
             $applied[] = 'not rated';
-        } elseif (($n = self::ratingAfter('at least|minimum of|min|over|more than|or more|or better|or higher', $q))
-            ?? ($n = self::ratingBefore('(?:stars?\s*)?(?:\+|or more|or better|or higher|and up|and above|plus)', $q))) {
+        } elseif ((($n = self::ratingAfter('(?:rated )?(?:at least|minimum of|min|over|more than)', '(?:\s*(?:stars?|out of 5|\/\s*5))\b', $q))
+            ?? ($n = self::ratingAfter('rated (?:at least|minimum of|min|over|more than)', '', $q))
+            ?? ($n = self::ratingBefore('\s*stars?\s*(?:\+|(?:or more|or better|or higher|and up|and above|plus)\b)', $q))
+            ?? ($n = self::ratingBefore('\s*(?:\+|(?:or more|or better|or higher|and up|and above|plus)\b)', $q, digitsOnly: true))) !== null) {
             // "more than 3" and "over 3" read as "at least 4"; the rest as "at least N".
             $ratingMin = preg_match('/\b(over|more than)\s+(?:a\s+)?(?:[0-5]|zero|one|two|three|four|five)\b/u', $q) ? min(5, $n + 1) : $n;
             $applied[] = "rated {$ratingMin} or more";
-        } elseif (($n = self::ratingAfter('rated|rating of|rating|gave|scored', $q))
-            ?? ($n = self::ratingBefore('stars?|out of 5|\/\s*5', $q))) {
+        } elseif ((($n = self::ratingAfter('rated|rating of|rating|gave|scored', '', $q))
+            ?? ($n = self::ratingBefore('[ -]?(?:stars?|out of 5|\/\s*5)\b', $q))) !== null) {
             $ratingExact = $n;
             $applied[] = "rated {$ratingExact}";
         }
 
-        // A bare four-digit number is not enough: "the 1984 one" is a title, and
-        // so is 2001. A year has to sit where a year sits, after "in", "from",
-        // "during", "since", or before "reads" / "books" / "list" ("my 2024 reads").
+        // Year. A bare four-digit number is not enough: "the 1984 one" is a title,
+        // and so is 2001. A year has to sit where a year sits: after "in", "from",
+        // "during", "back in", or before "reads" / "books" / "list" ("my 2024
+        // reads"). "since 2023" is a lower bound, not a year.
         $year = null;
-        if (preg_match('/\b(?:in|during|from|since|back in|of)\s+(?<y>19[5-9]\d|20[0-4]\d)\b|\b(?<y2>19[5-9]\d|20[0-4]\d)\s+(?:reads?|books?|reading|list|library)\b/u', $q, $m)) {
+        $yearFrom = null;
+        if (preg_match('/\bsince\s+(?<y>19[5-9]\d|20[0-4]\d)\b/u', $q, $m)) {
+            $yearFrom = (int) $m['y'];
+            $applied[] = "finished since {$yearFrom}";
+        } elseif (preg_match('/\b(?:in|during|from|back in|of)\s+(?<y>19[5-9]\d|20[0-4]\d)\b|\b(?<y2>19[5-9]\d|20[0-4]\d)\s+(?:reads?|books?|reading|list|library)\b/u', $q, $m)) {
             $year = (int) ($m['y'] !== '' ? $m['y'] : $m['y2']);
         } elseif (preg_match('/\blast year\b/u', $q)) {
             $year = $today->year - 1;
@@ -88,27 +102,34 @@ final readonly class LibraryQuestion
             $applied[] = "finished in {$year}";
         }
 
-        return new self(trim($question), $format, $ratingExact, $ratingMin, $unrated, $year, $applied);
+        return new self(trim($question), $format, $ratingExact, $ratingMin, $unrated, $year, $yearFrom, $applied);
     }
 
     private const NUMBER = '(?<n>[0-5]|zero|one|two|three|four|five)';
 
     private const WORDS = ['zero' => 0, 'one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5];
 
-    /** A number 0 to 5, in digits or words, right after one of the phrases. */
-    private static function ratingAfter(string $phrases, string $q): ?int
+    /**
+     * A number 0 to 5, in digits or words, right after one of the phrases and,
+     * when $after is given, followed by that (a rating word).
+     */
+    private static function ratingAfter(string $phrases, string $after, string $q): ?int
     {
-        if (! preg_match('/\b(?:'.$phrases.')\s+(?:a\s+)?'.self::NUMBER.'\b/u', $q, $m)) {
+        if (! preg_match('/\b(?:'.$phrases.')\s+(?:a\s+)?'.self::NUMBER.'\b'.$after.'/u', $q, $m)) {
             return null;
         }
 
         return self::WORDS[$m['n']] ?? (int) $m['n'];
     }
 
-    /** A number 0 to 5, in digits or words, right before one of the phrases ("4 stars", "5+"). */
-    private static function ratingBefore(string $phrases, string $q): ?int
+    /**
+     * A number 0 to 5 right before one of the phrases ("4 stars", "5+"). With
+     * $digitsOnly, "one or more" is not a rating but "1 or more" is.
+     */
+    private static function ratingBefore(string $phrases, string $q, bool $digitsOnly = false): ?int
     {
-        if (! preg_match('/\b'.self::NUMBER.'[ -]?(?:'.$phrases.')/u', $q, $m)) {
+        $number = $digitsOnly ? '(?<n>[0-5])' : self::NUMBER;
+        if (! preg_match('/\b'.$number.$phrases.'/u', $q, $m)) {
             return null;
         }
 
@@ -142,10 +163,13 @@ final readonly class LibraryQuestion
         if ($this->ratingMin !== null) {
             $query->where('rating', '>=', $this->ratingMin);
         }
+        // whereYear() is portable: Laravel renders strftime on SQLite and
+        // extract() on Postgres.
         if ($this->year !== null) {
-            // whereYear() is portable: Laravel renders strftime on SQLite and
-            // extract() on Postgres.
             $query->whereYear('finished_at', $this->year);
+        }
+        if ($this->yearFrom !== null) {
+            $query->whereYear('finished_at', '>=', $this->yearFrom);
         }
 
         return $query;

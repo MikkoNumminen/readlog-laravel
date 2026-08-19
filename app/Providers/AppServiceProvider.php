@@ -3,6 +3,9 @@
 namespace App\Providers;
 
 use App\Services\CurrentUser;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +34,17 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // "Ask your library" costs seconds of a local model per request and the
+        // app can be on a public URL. Ten questions a minute per address is more
+        // than a person asks; a page without ?ask= is not counted at all.
+        RateLimiter::for('ask', function (Request $request) {
+            $ask = $request->query('ask');
+
+            return is_string($ask) && trim($ask) !== ''
+                ? Limit::perMinute(10)->by($request->ip())
+                : Limit::none();
+        });
+
         // .NET counterpart: the ambient `User` a Razor view can read without anyone
         // passing it in. Blade has no ambient principal, so the reader switcher gets
         // its data from a view composer rather than reaching into the container from

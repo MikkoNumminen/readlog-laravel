@@ -29,7 +29,7 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-308 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
+326 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
 ```
 
 ## What each pull request contains
@@ -158,6 +158,7 @@ its own self-review.
 | [17](https://github.com/MikkoNumminen/readlog-laravel/pull/17) | ReadLog Control: a desktop panel (status board, on, off, tunnel on and off, smoke, embed, warm, ask). |
 | [18](https://github.com/MikkoNumminen/readlog-laravel/pull/18) | AI search 2/3: "ask your library", three layers, degrading to the title search. |
 | [19](https://github.com/MikkoNumminen/readlog-laravel/pull/19) | AI search 3/3: documentation, this table, TODO.md trimmed. |
+| [20](https://github.com/MikkoNumminen/readlog-laravel/pull/20) | Review pass over PRs 16 to 19: thirteen findings fixed (parser false positives, nginx timeout, throttle, embedding race, control panel edge cases). |
 
 ## Hosting: what is automated and what is manual
 
@@ -276,7 +277,7 @@ persistence beyond the storage volume, a deploy pipeline).
 ### AI features
 
 "Ask your library" is implemented (README has the description, DECISIONS.md
-#94 to #103 the reasoning). It was built after version 1 was closed and
+#94 to #108 the reasoning). It was built after version 1 was closed and
 compared, so the comparison in MIGRATION.md stays honest: it is called out
 there as the one thing with no .NET counterpart. What the model knows is what
 the log knows, title and author and the entry's own facts, so questions about
@@ -314,7 +315,7 @@ docker compose exec app php artisan readlog:smoke --url=http://web
                                         # 6 PASS, 1 WARN (no Google key)
 ```
 
-As of PR 19 the same commands give 308 passed, 3 skipped, on both databases, and
+As of PR 20 the same commands give 326 passed, 3 skipped, on both databases, and
 `composer analyse` (PHPStan level 6) is clean; CI runs all of it on every push.
 
 Plus a manual pass over every route with `php artisan serve` and again through
