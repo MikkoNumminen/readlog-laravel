@@ -67,8 +67,8 @@ class SmokeCheck extends Command
         $this->newLine();
         $this->table(['Check', 'Result', 'Detail'], $this->rows);
 
-        $failed = collect($this->rows)->where(1, 'FAIL')->count();
-        $warned = collect($this->rows)->where(1, 'WARN')->count();
+        $failed = count(array_filter($this->rows, fn (array $row) => $row[1] === 'FAIL'));
+        $warned = count(array_filter($this->rows, fn (array $row) => $row[1] === 'WARN'));
 
         $this->newLine();
         if ($failed > 0) {

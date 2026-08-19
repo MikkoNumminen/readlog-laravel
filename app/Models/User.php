@@ -5,10 +5,12 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 
 /**
  * The application user.
@@ -20,6 +22,13 @@ use Illuminate\Notifications\Notifiable;
  *
  * The `password` column is left in place, unused, so that adding real
  * authentication later is a matter of wiring, not a schema change.
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property string|null $image
+ * @property Carbon|null $email_verified_at
+ * @property-read Collection<int, ReadEntry> $readEntries
  */
 #[Fillable(['name', 'email', 'password', 'image'])]
 #[Hidden(['password', 'remember_token'])]

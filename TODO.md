@@ -124,13 +124,6 @@ becomes `actingAs()`, and the switcher is deleted. Laravel Fortify or a
 hand-rolled session login would both do it without adding npm, which Laravel
 Breeze would. The users table already carries a `password` column for this.
 
-**A static analyser.** The single largest thing lost in the move. readlog-dotnet
-sets `WarningsAsErrors=nullable`, so a possible null dereference does not compile.
-PHP has nothing equivalent running before the code does. PHPStan at a high level,
-or Psalm, would recover most of it, and CI already has a place to put it next to
-`pint --test`. See the "Two guarantees that did not survive" section of
-MIGRATION.md.
-
 **The rating check constraint.** The .NET schema bounds `rating` to 0 to 5 at the
 database level with `CK_ReadEntry_Rating`. Laravel's schema builder cannot express
 a check constraint and SQLite cannot add one to an existing table, so the bound

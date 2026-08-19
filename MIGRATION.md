@@ -315,8 +315,13 @@ if a trigger or a raw `CREATE TABLE` ever restores the guarantee.
 `Directory.Build.props`, so a possible null dereference does not compile. PHP 8.4
 has typed properties and nullable type hints, which catch a lot, but they are
 checked at runtime and only where a type is declared. The equivalent guarantee
-would need a static analyser such as PHPStan or Psalm. That is a real gap in this
-port and it is listed in TODO.md.
+needs a separate static analyser, and this port now runs one: PHPStan (through
+Larastan) at level 6, in CI. Turning it on after the fact was instructive. Of the
+twenty-one findings, one was a genuine dead branch (a null check on a NOT NULL
+column) and the rest were the type information Eloquent never carries: an
+analyser cannot know that `$entry->format` is an enum and `$entry->finished_at`
+a date unless the model says so in `@property` lines, which is the PHP stand-in
+for the CLR property types EF Core gets for free.
 
 ### Two libraries that behave differently
 

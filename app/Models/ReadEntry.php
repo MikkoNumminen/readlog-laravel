@@ -4,15 +4,32 @@ namespace App\Models;
 
 use App\Casts\DateOnly;
 use App\Enums\Format;
+use Carbon\CarbonImmutable;
 use Database\Factories\ReadEntryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A single "I finished this book" record, owned by one user.
  *
  * .NET counterpart: Models/ReadEntry.cs.
+ *
+ * The @property lines are the attribute types as the casts below produce them.
+ * Eloquent will not tell a static analyser what $entry->format is; the .NET
+ * entity carries the same information in its property declarations.
+ *
+ * @property int $id
+ * @property int $user_id
+ * @property int $book_id
+ * @property Format $format
+ * @property-read CarbonImmutable $finished_at
+ * @property-write CarbonImmutable|\DateTimeInterface|string $finished_at
+ * @property int|null $rating
+ * @property Carbon $created_at
+ * @property-read User $user
+ * @property-read Book $book
  */
 class ReadEntry extends Model
 {

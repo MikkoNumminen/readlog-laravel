@@ -67,7 +67,9 @@ class OpenLibraryClient
 
         // Same rule as the Google client: a malformed element is skipped, not
         // allowed to sink the whole response.
-        return collect($response->json('docs') ?? [])
+        $docs = $response->json('docs');
+
+        return collect(is_array($docs) ? $docs : [])
             ->filter(fn ($doc) => is_array($doc))
             ->map(fn (array $doc) => $this->map($doc))
             ->values();

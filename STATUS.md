@@ -227,13 +227,17 @@ Cyrillic or CJK titles both key on the empty string and one is thrown away. The
 Both are in readlog-dotnet and both are pinned by tests asserting the current
 behaviour, so a future fix has to change a test on purpose rather than by accident.
 
-### No static analyser
+### Static analysis: PHPStan level 6, in CI
 
 readlog-dotnet sets `WarningsAsErrors=nullable`, so a possible null dereference
-does not compile. Nothing equivalent runs here before the code does. PHPStan or
-Psalm would recover most of it and CI already has a place for it next to
-`pint --test`. This is the single largest thing lost in the move and it is in
-TODO.md.
+does not compile. The nearest thing PHP has is a separate analyser: PHPStan via
+Larastan runs at level 6 in CI (`composer analyse` locally). Turning it on found
+twenty-one things, of which one was a real dead branch (a null check on a
+NOT NULL column) and the rest were the type information Eloquent never carries:
+`@property` declarations on the three models, the generic on the custom date
+cast, and a positional-array `where()` in the smoke check that happened to work.
+Levels above 6 start arguing about union types in ways that produce more
+annotations than findings for an app this size.
 
 ### No hosted instance
 

@@ -28,6 +28,8 @@ use Illuminate\Database\Eloquent\Model;
  * CarbonImmutable rather than Carbon is deliberate: DateOnly is a value type in
  * .NET, and an immutable instance keeps `$entry->finished_at->addDay()` from
  * quietly mutating the model's attribute.
+ *
+ * @implements CastsAttributes<CarbonImmutable, CarbonImmutable|DateTimeInterface|string>
  */
 class DateOnly implements CastsAttributes
 {
