@@ -42,3 +42,11 @@ it('binds the reader switcher without an inline event handler', function () {
     expect($html)->toContain('data-auto-submit')
         ->and($html)->not->toContain('onchange=');
 });
+
+it('names the app in every response, so the portal can tell it from a stranger on the same funnel port', function () {
+    // The portal at mikkonumminen.dev/readlog-laravel shares a funnel port with
+    // another project; without this header it cannot tell that project's 404
+    // from one of ours. nginx adds the same header for responses PHP never sees.
+    $this->get('/')->assertOk()->assertHeader('X-ReadLog-App', '1');
+    $this->get('/definitely-not-a-route')->assertNotFound()->assertHeader('X-ReadLog-App', '1');
+});
