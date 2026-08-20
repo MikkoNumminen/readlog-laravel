@@ -29,6 +29,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SecurityHeaders
 {
+    /** Names this app in a response, for the portal in front of it. */
+    public const APP_MARKER = 'X-ReadLog-App';
+
     private const CONTENT_SECURITY_POLICY = "default-src 'self'; base-uri 'self'; object-src 'none'; "
         ."frame-ancestors 'none'; img-src 'self' https: data:; script-src 'self'; "
         ."style-src 'self' 'unsafe-inline'; form-action 'self'";
@@ -37,6 +40,14 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        // "This answer came from ReadLog." The portal that serves this app at
+        // mikkonumminen.dev/readlog-laravel shares a funnel port with another
+        // project, whose root handler answers 404 for our paths whenever our
+        // mount is absent. Without a marker the portal cannot tell that 404
+        // from one of ours, and would show a stranger's error instead of the
+        // snapshot it falls back to. nginx adds the same header for the
+        // responses it generates itself; see docker/nginx.conf.
+        $response->headers->set(self::APP_MARKER, '1');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         $response->headers->set('X-Frame-Options', 'DENY');
