@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\PortalPrefix;
 use App\Http\Middleware\RequireDemoUser;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -26,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // security headers on every response, registered before the endpoints so it
         // covers error responses too.
         $middleware->append(SecurityHeaders::class);
+
+        // Served live under https://mikkonumminen.dev/readlog-laravel, every
+        // generated URL has to start there; see the class for the whole story.
+        $middleware->append(PortalPrefix::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

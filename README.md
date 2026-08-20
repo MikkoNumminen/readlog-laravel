@@ -9,10 +9,11 @@ words ("audiobooks I rated 5 last year", "the one about a desert planet") and a
 model running on your own machine answers from your entries; see
 [Ask your library](#ask-your-library).
 
-**Live site:** <https://mikkonumminen.dev/readlog-laravel>, a static snapshot of
-the seeded library served from the author's portfolio (details under
-[Where it runs](#where-it-runs)). The app itself runs on the author's own machine and goes on
-a public URL on demand; [DEMO.md](DEMO.md) is how.
+**Live site:** <https://mikkonumminen.dev/readlog-laravel>. When the author's
+machine is on, that address serves the real app, proxied from the machine;
+when it is off, the same address serves a static snapshot of the seeded
+library, so it never breaks (details under [Where it runs](#where-it-runs)).
+[DEMO.md](DEMO.md) is how the switch works.
 
 This repository is a **documented migration** of
 [readlog-dotnet](https://github.com/MikkoNumminen/readlog-dotnet) (ASP.NET Core 8,

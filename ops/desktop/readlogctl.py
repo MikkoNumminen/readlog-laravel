@@ -13,8 +13,12 @@ on the desktop.
     python ops/desktop/readlogctl.py              interactive: board + menu
     python ops/desktop/readlogctl.py status       one-shot board
     python ops/desktop/readlogctl.py watch        live board, Ctrl-C leaves
-    python ops/desktop/readlogctl.py on           docker compose up, wait until healthy
-    python ops/desktop/readlogctl.py off          docker compose down (data stays)
+    python ops/desktop/readlogctl.py on           EVERYTHING on: Docker Desktop, Ollama,
+                                                  the app, warm models, and the live page at
+                                                  https://mikkonumminen.dev/readlog-laravel
+    python ops/desktop/readlogctl.py off          everything readlog owns goes down; the
+                                                  public page falls back to the snapshot;
+                                                  Ollama and Docker stay up (hibernating)
     python ops/desktop/readlogctl.py open         open the app in the browser
     python ops/desktop/readlogctl.py tunnel on    public URL through a Cloudflare quick tunnel
     python ops/desktop/readlogctl.py tunnel off
@@ -52,7 +56,17 @@ TUNNEL_PID_FILE = REPO / ".tunnel.pid"      # only for a natively run cloudflare
 TUNNEL_LOG_FILE = REPO / ".tunnel.log"
 CLOUDFLARED_IMAGE = "cloudflare/cloudflared"
 CLOUDFLARED_LOCAL = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "cloudflared" / "cloudflared.exe"
-LIVE_SNAPSHOT = "https://mikkonumminen.dev/readlog-laravel"
+PORTAL = "https://mikkonumminen.dev/readlog-laravel"
+LIVE_SNAPSHOT = PORTAL  # same address; the portal serves the snapshot as its fallback
+# The portfolio's funnel node. readlog owns exactly one path mount on the shared
+# 443 funnel; every command here is scoped to that one path (--set-path), which
+# was verified to leave the RAG's "/" handler alone. The RAG's own "down" wipes
+# the whole port including our mount; the portal then falls back to the
+# snapshot, and the next readlog "on" re-asserts the mount.
+TAILSCALE = Path("C:/Program Files/Tailscale/tailscale.exe")
+FUNNEL_PATH = "/readlog-laravel"
+DOCKER_DESKTOP = Path("C:/Program Files/Docker/Docker/Docker Desktop.exe")
+OLLAMA_CONTAINER_DEFAULT = "mikkonumminendev-ollama-1"
 IS_WINDOWS = os.name == "nt"
 
 
@@ -86,6 +100,9 @@ ENV = dotenv()
 APP_PORT = ENV.get("APP_PORT", "8080")
 APP_URL = f"http://127.0.0.1:{APP_PORT}"
 OLLAMA_NETWORK = ENV.get("OLLAMA_DOCKER_NETWORK", "")
+# The Ollama container "on" may start (plain `docker start`, never compose, so
+# its configuration cannot change). Empty disables the step.
+OLLAMA_CONTAINER = ENV.get("OLLAMA_CONTAINER", OLLAMA_CONTAINER_DEFAULT if OLLAMA_NETWORK else "")
 
 
 _network_present: bool | None = None
@@ -191,6 +208,58 @@ def http_get(url: str, timeout: float = 4.0) -> tuple[int | None, float, str]:
 
 
 # --- checks (each returns (state, detail)) -----------------------------------
+
+
+def funnel_mounted() -> bool:
+    """Is our path mount on the shared funnel? Scoped read; parses the plain
+    status output, which lists one line per handler."""
+    if not TAILSCALE.exists():
+        return False
+    rc, out = run([str(TAILSCALE), "funnel", "status"], timeout=15)
+    if rc != 0:
+        return False
+
+    return any(FUNNEL_PATH == ln.split()[1] for ln in out.splitlines() if "proxy" in ln and len(ln.split()) > 1)
+
+
+def check_portal() -> tuple[str, str]:
+    """What does the public page actually serve right now? The portal function
+    labels every response: live (proxied from this machine) or snapshot."""
+    # The root, not /up: the snapshot fallback has an index page there, so the
+    # label header is present in both states.
+    status, ms, _, headers = http_head(PORTAL)
+    if status is None:
+        return ("down", f"{PORTAL} not answering (no internet, or Vercel down)")
+    source = (headers or {}).get("x-readlog-source", "")
+    if source == "live":
+        return ("ok", f"{PORTAL} serving THIS machine ({ms:.0f} ms)")
+    if source == "snapshot" or status == 200:
+        return ("off", f"{PORTAL} serving the static snapshot")
+    return ("warn", f"{PORTAL} answered {status}")
+
+
+def http_head(url: str, timeout: float = 8.0) -> tuple[int | None, float, str, dict[str, str] | None]:
+    """Like http_get, but also returns lower-cased response headers."""
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            body = r.read(200).decode("utf-8", errors="replace")
+            headers = {k.lower(): v for k, v in r.headers.items()}
+            return r.status, (time.monotonic() - started) * 1000, body, headers
+    except urllib.error.HTTPError as e:
+        return e.code, (time.monotonic() - started) * 1000, "", {k.lower(): v for k, v in e.headers.items()}
+    except Exception:
+        return None, (time.monotonic() - started) * 1000, "", None
+
+
+def ollama_container_state() -> str:
+    """'running', 'stopped', 'absent', or '' when no container is configured."""
+    if not OLLAMA_CONTAINER:
+        return ""
+    rc, out = run(["docker", "inspect", "-f", "{{.State.Running}}", OLLAMA_CONTAINER], timeout=10)
+    if rc != 0:
+        return "absent"
+    return "running" if "true" in out.lower() else "stopped"
 
 
 def check_docker() -> tuple[str, str]:
@@ -333,7 +402,7 @@ def board(with_ollama: bool = True) -> tuple[bool, dict[str, str]]:
     print(line("tunnel", *check_tunnel(services)))
     if with_ollama:
         print(line("ollama (AI search)", *check_ollama(services)))
-    print(line("live snapshot", "info", LIVE_SNAPSHOT + "  (static, always up)"))
+    print(line("portal", *check_portal()))
     print()
     if app_state == "ok":
         print(f"  readlog is {c('ON', '32')}  ->  {APP_URL}" + (f"   public: {tunnel_url()}" if check_tunnel(services)[0] == "ok" else ""))
@@ -347,9 +416,33 @@ def board(with_ollama: bool = True) -> tuple[bool, dict[str, str]]:
 
 
 def do_on() -> int:
+    # 1. Docker Desktop. Started here rather than reported, because "on" means on.
     if check_docker()[0] != "ok":
-        print("  Docker Desktop is not running. Start it, wait for the whale to settle, then try again.")
-        return 1
+        if not DOCKER_DESKTOP.exists():
+            print("  Docker Desktop is not installed where expected; start Docker and try again.")
+            return 1
+        print("  == starting Docker Desktop (up to two minutes on a cold machine) ==")
+        subprocess.Popen([str(DOCKER_DESKTOP)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(60):
+            time.sleep(3)
+            if check_docker()[0] == "ok":
+                break
+        else:
+            print(c("  Docker's engine did not come up; open Docker Desktop and run `on` again.", "31"))
+            return 1
+
+    # 2. Ollama, for the AI search. A plain `docker start` of the existing
+    # container: it reuses the container exactly as its own project configured
+    # it, so nothing about that project can change here. Never compose.
+    state = ollama_container_state()
+    if state == "stopped":
+        print(f"  == starting the Ollama container ({OLLAMA_CONTAINER}) ==")
+        rc, out = run(["docker", "start", OLLAMA_CONTAINER], timeout=60)
+        if rc != 0:
+            print(c(f"  could not start {OLLAMA_CONTAINER}: {out.strip()}; AI search will fall back.", "33"))
+    elif state == "absent":
+        print(c(f"  Ollama container {OLLAMA_CONTAINER} does not exist; AI search will fall back to title matching.", "33"))
+
     if OLLAMA_NETWORK and not ollama_network_present(refresh=True):
         print(c(f"  Ollama's network {OLLAMA_NETWORK} does not exist (its stack is down); starting without it,", "33"))
         print(c("  AI search will fall back to title matching. Run `on` again once that stack is up.", "33"))
@@ -366,6 +459,40 @@ def do_on() -> int:
             compose("exec", "-T", "app", "php", "artisan", "readlog:ask", "--warm", timeout=300, capture=False)
         except KeyboardInterrupt:
             print("  (warm-up skipped)")
+
+    # 3. The public page. One scoped path mount on the shared funnel; the RAG's
+    # "/" handler is untouched (verified; see FUNNEL_PATH above).
+    return portal_on()
+
+
+def portal_on() -> int:
+    if not TAILSCALE.exists():
+        print(c("  tailscale.exe not found; the portal stays on the snapshot.", "33"))
+        return 1
+    print("  == putting the live app behind https://mikkonumminen.dev/readlog-laravel ==")
+    rc, out = run([str(TAILSCALE), "funnel", "--bg", "--set-path", FUNNEL_PATH, APP_URL], timeout=30)
+    if rc != 0:
+        print(c(f"  funnel mount failed: {out.strip()}", "31"))
+        return 1
+    # The portal function probes this machine per request; give the first one a moment.
+    for _ in range(10):
+        state, detail = check_portal()
+        if state == "ok":
+            print(f"  {detail}")
+            return 0
+        time.sleep(3)
+    state, detail = check_portal()
+    print(c(f"  portal: {detail}", "33" if state != "ok" else "32"))
+    print("  (the mount is up; if the page still shows the snapshot, the portal function may be a deploy behind)")
+    return 0 if state == "ok" else 1
+
+
+def portal_off() -> int:
+    if not TAILSCALE.exists():
+        return 0
+    if funnel_mounted():
+        run([str(TAILSCALE), "funnel", "--https=443", "--set-path", FUNNEL_PATH, "off"], timeout=30)
+        print("  portal mount removed; https://mikkonumminen.dev/readlog-laravel serves the snapshot again")
     return 0
 
 
@@ -386,6 +513,7 @@ def do_ask(question: str) -> int:
 
 
 def do_off() -> int:
+    portal_off()
     if native_tunnel_pid():
         do_tunnel_off()
     print("  == docker compose down (the database volume stays) ==")
