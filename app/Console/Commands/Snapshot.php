@@ -62,9 +62,9 @@ class Snapshot extends Command
     private const ORIGIN = 'http://localhost';
 
     private const BANNER = '<div class="rl-notice" role="note">This is a static snapshot of ReadLog (Laravel). '
-        .'Search, forms and the multi-source book lookup are inactive here. The full app runs locally with one '
-        .'Docker command; the source is at <a href="https://github.com/MikkoNumminen/readlog-laravel">'
-        .'github.com/MikkoNumminen/readlog-laravel</a>.</div>';
+        .'Search, forms, the multi-source book lookup and the AI &quot;ask your library&quot; box are inactive '
+        .'here. The full app runs locally with one Docker command; the source is at '
+        .'<a href="https://github.com/MikkoNumminen/readlog-laravel">github.com/MikkoNumminen/readlog-laravel</a>.</div>';
 
     private string $out;
 

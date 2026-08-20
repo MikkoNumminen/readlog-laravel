@@ -98,6 +98,7 @@ it('injects the snapshot notice and drops the script tag by default', function (
     $index = File::get(snapshotDir().'/index.html');
 
     expect($index)->toContain('static snapshot of ReadLog')
+        ->and($index)->toContain('the AI &quot;ask your library&quot; box are inactive')
         ->and($index)->toContain('github.com/MikkoNumminen/readlog-laravel')
         ->and($index)->not->toContain('<script');
 });
