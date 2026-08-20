@@ -139,7 +139,7 @@ Self-review found the scripts committed without their executable bit (Git on
 Windows does not record it), a stale `.tunnel-url` that could have been copied
 into the image, and three tests that were wrong when first written.
 
-### Pull requests 8 to 23, in one table
+### Pull requests 8 to 24, in one table
 
 Later runs were smaller and are recorded here in one line each; every PR carries
 its own self-review.
@@ -161,7 +161,7 @@ its own self-review.
 | [20](https://github.com/MikkoNumminen/readlog-laravel/pull/20) | Review pass over PRs 16 to 19: thirteen findings fixed (parser false positives, nginx timeout, throttle, embedding race, control panel edge cases). |
 | [21](https://github.com/MikkoNumminen/readlog-laravel/pull/21) | Snapshot banner names the AI ask box as inactive too. |
 | [22](https://github.com/MikkoNumminen/readlog-laravel/pull/22) | The live app under mikkonumminen.dev/readlog-laravel: `PortalPrefix`, the funnel path mount, on means everything. |
-| [23](https://github.com/MikkoNumminen/readlog-laravel/pull/23) | Making the repository legible to a coding agent: ARCHITECTURE.md, AGENTS.md, CONTRIBUTING.md, invariants, recipes, glossary, `docs/machine/*.json`, and `readlog:docs-check` in `composer verify` and CI. |
+| [24](https://github.com/MikkoNumminen/readlog-laravel/pull/24) | Making the repository legible to a coding agent: ARCHITECTURE.md, AGENTS.md, CONTRIBUTING.md, invariants, recipes, glossary, `docs/machine/*.json`, and `readlog:docs-check` in `composer verify` and CI. |
 
 ## Hosting: what is automated and what is manual
 
@@ -302,7 +302,7 @@ the LLM-assisted metadata merge remain parked in TODO.md.
 
 ## Documentation as a checked artifact
 
-As of PR 23 the documentation is not only written, it is checked. `composer verify`
+As of PR 24 the documentation is not only written, it is checked. `composer verify`
 runs `php artisan readlog:docs-check`, which fails the build when a relative link
 does not resolve, when a repository path named in prose does not exist, when a route
 exists that `ARCHITECTURE.md` does not document, when `config/services.php` reads an
@@ -349,7 +349,7 @@ docker compose exec app php artisan readlog:smoke --url=http://web
                                         # 6 PASS, 1 WARN (no Google key)
 ```
 
-As of PR 23 the same commands give 344 passed, 3 skipped, on both databases, and
+As of PR 24 the same commands give 344 passed, 3 skipped, on both databases, and
 `composer analyse` (PHPStan level 6) is clean; CI runs all of it on every push.
 
 Plus a manual pass over every route with `php artisan serve` and again through

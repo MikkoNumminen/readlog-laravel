@@ -448,7 +448,7 @@ one to write, because the port had already decided how the codebase treats an
 optional external service.
 
 **The agent-facing documentation layer** (`ARCHITECTURE.md`, `AGENTS.md`,
-`CONTRIBUTING.md`, `docs/`, PR 23) has no counterpart either, and readlog-dotnet
+`CONTRIBUTING.md`, `docs/`, PR 24) has no counterpart either, and readlog-dotnet
 needs less of it for a reason worth recording. A C# reader gets from the compiler
 and the IDE much of what this layer has to write down: the dependency direction is
 visible in the project references, the request pipeline is a readable sequence in
