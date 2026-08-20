@@ -29,7 +29,7 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-326 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
+344 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
 ```
 
 ## What each pull request contains
@@ -139,7 +139,7 @@ Self-review found the scripts committed without their executable bit (Git on
 Windows does not record it), a stale `.tunnel-url` that could have been copied
 into the image, and three tests that were wrong when first written.
 
-### Pull requests 8 to 19, in one table
+### Pull requests 8 to 23, in one table
 
 Later runs were smaller and are recorded here in one line each; every PR carries
 its own self-review.
@@ -159,6 +159,9 @@ its own self-review.
 | [18](https://github.com/MikkoNumminen/readlog-laravel/pull/18) | AI search 2/3: "ask your library", three layers, degrading to the title search. |
 | [19](https://github.com/MikkoNumminen/readlog-laravel/pull/19) | AI search 3/3: documentation, this table, TODO.md trimmed. |
 | [20](https://github.com/MikkoNumminen/readlog-laravel/pull/20) | Review pass over PRs 16 to 19: thirteen findings fixed (parser false positives, nginx timeout, throttle, embedding race, control panel edge cases). |
+| [21](https://github.com/MikkoNumminen/readlog-laravel/pull/21) | Snapshot banner names the AI ask box as inactive too. |
+| [22](https://github.com/MikkoNumminen/readlog-laravel/pull/22) | The live app under mikkonumminen.dev/readlog-laravel: `PortalPrefix`, the funnel path mount, on means everything. |
+| [23](https://github.com/MikkoNumminen/readlog-laravel/pull/23) | Making the repository legible to a coding agent: ARCHITECTURE.md, AGENTS.md, CONTRIBUTING.md, invariants, recipes, glossary, `docs/machine/*.json`, and `readlog:docs-check` in `composer verify` and CI. |
 
 ## Hosting: what is automated and what is manual
 
@@ -297,14 +300,45 @@ the LLM-assisted metadata merge remain parked in TODO.md.
   placeholder, because the placeholder only appears when the URL is absent, not
   when it fails to load. Same behaviour as the source.
 
+## Documentation as a checked artifact
+
+As of PR 23 the documentation is not only written, it is checked. `composer verify`
+runs `php artisan readlog:docs-check`, which fails the build when a relative link
+does not resolve, when a repository path named in prose does not exist, when a route
+exists that `ARCHITECTURE.md` does not document, when `config/services.php` reads an
+environment variable `.env.example` does not explain, when the generated files under
+`docs/machine/` are stale against their prose sources, or when a document contains an
+em dash.
+
+It was written because the counts in this file and in README.md had been wrong for
+two pull requests and nothing had noticed: one paragraph said 222 tests, another
+said 326, and the tree held 338. The command deliberately does not run the suite,
+because a suite that counts itself proves nothing; CI compares the real run's case
+total against `docs/machine/test-counts.json` from outside instead.
+
+It was written by scoring the repository against a published rubric
+([docs/AI-FIRST.md](docs/AI-FIRST.md)) with three independent graders, three times.
+The score went 4.8, then 8.5, then 9.0, and each round found real bugs by running
+the repository rather than reading it: a fixed-path temp database that made the
+suite red on roughly a third of runs, a PHP version constraint that was two minor
+versions too low for the committed lockfile, a test assertion that collided with
+process ids containing "405", and a CI step that read the wrong XML node and would
+have failed every run. Decisions 121 to 128.
+
+The agent-facing surface it guards is `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`,
+`CONTRIBUTING.md`, `docs/INVARIANTS.md` (59 invariants, each naming its guarding
+test), `docs/RECIPES.md`, `docs/GLOSSARY.md`, `docs/AI-FIRST.md` and the JSON under
+`docs/machine/`.
+
 ## Verification
 
 Everything below was run on the final state of the branch:
 
 ```
 php artisan migrate:fresh --seed        # clean database, 12 books, 14 entries
-vendor/bin/pest                         # 222 passed, 3 skipped, 562 assertions (SQLite)
-DB_CONNECTION=pgsql ... vendor/bin/pest # 222 passed, 3 skipped (Postgres 16)
+composer verify                         # pint, phpstan level 6, pest, docs-check: green
+vendor/bin/pest                         # 344 passed, 3 skipped, 1203 assertions (SQLite)
+DB_CONNECTION=pgsql ... vendor/bin/pest # 344 passed, 3 skipped (Postgres 16)
 vendor/bin/pint --test                  # passed
 BOOK_SEARCH_LIVE_TESTS=true \
   vendor/bin/pest --filter=LiveProvider # 1 passed, 2 skipped (no Google key)
@@ -315,7 +349,7 @@ docker compose exec app php artisan readlog:smoke --url=http://web
                                         # 6 PASS, 1 WARN (no Google key)
 ```
 
-As of PR 20 the same commands give 326 passed, 3 skipped, on both databases, and
+As of PR 23 the same commands give 344 passed, 3 skipped, on both databases, and
 `composer analyse` (PHPStan level 6) is clean; CI runs all of it on every push.
 
 Plus a manual pass over every route with `php artisan serve` and again through

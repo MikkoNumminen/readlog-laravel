@@ -1,0 +1,373 @@
+{
+    "$comment": "Hand written. The prose form is docs/INVARIANTS.md; readlog:docs-check keeps the two in step and verifies every guard file exists.",
+    "source": "docs/INVARIANTS.md",
+    "count": 59,
+    "categories": [
+        "Data integrity",
+        "Deployment behaviour",
+        "Failure tolerance",
+        "Ownership",
+        "Portability",
+        "Privacy and secrets",
+        "The AI containment boundary"
+    ],
+    "invariants": [
+        {
+            "id": "A1",
+            "category": "The AI containment boundary",
+            "invariant": "The model is shown only entries that already passed the deterministic filters",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A2",
+            "category": "The AI containment boundary",
+            "invariant": "Ids the model was not shown are dropped from its citations",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A3",
+            "category": "The AI containment boundary",
+            "invariant": "The model is only ever shown the acting reader's entries",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A4",
+            "category": "The AI containment boundary",
+            "invariant": "An empty library is answered without calling the model at all",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A5",
+            "category": "The AI containment boundary",
+            "invariant": "An empty question never reaches Ollama",
+            "guardedBy": "tests/Feature/Http/LibraryAskPageTest.php"
+        },
+        {
+            "id": "A6",
+            "category": "The AI containment boundary",
+            "invariant": "The question length is capped before it reaches Ollama",
+            "guardedBy": "tests/Feature/Http/LibraryAskPageTest.php"
+        },
+        {
+            "id": "A7",
+            "category": "The AI containment boundary",
+            "invariant": "Filters that match nothing are relaxed, and the page shows that they were",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A8",
+            "category": "The AI containment boundary",
+            "invariant": "Entries the model saw but did not cite stay visible, so a miss is visible",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "A9",
+            "category": "The AI containment boundary",
+            "invariant": "Questions are rate limited per address; plain library visits are not",
+            "guardedBy": "tests/Feature/Http/LibraryAskPageTest.php"
+        },
+        {
+            "id": "A10",
+            "category": "The AI containment boundary",
+            "invariant": "The grid and list toggle does not carry the question, so it does not re-ask the model",
+            "guardedBy": "tests/Feature/Http/LibraryAskPageTest.php"
+        },
+        {
+            "id": "D1",
+            "category": "Data integrity",
+            "invariant": "One reader cannot log the same book twice on the same date",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D2",
+            "category": "Data integrity",
+            "invariant": "The same reader can log the same book on a different date",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D3",
+            "category": "Data integrity",
+            "invariant": "Two readers can log the same catalogue book on the same date",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D4",
+            "category": "Data integrity",
+            "invariant": "`open_library_id` is unique where present, and many books may have none",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D5",
+            "category": "Data integrity",
+            "invariant": "Deleting a reader deletes their entries",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D6",
+            "category": "Data integrity",
+            "invariant": "A book that entries still point at cannot be deleted",
+            "guardedBy": "tests/Feature/Database/SchemaConstraintsTest.php"
+        },
+        {
+            "id": "D7",
+            "category": "Data integrity",
+            "invariant": "Deleting a reading entry keeps the catalogue book",
+            "guardedBy": "tests/Feature/Http/EntryEditTest.php"
+        },
+        {
+            "id": "D8",
+            "category": "Data integrity",
+            "invariant": "Editing an entry changes the reader's fields, never the shared book title",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "D9",
+            "category": "Data integrity",
+            "invariant": "An edit colliding with an existing entry on the same date is refused with a message",
+            "guardedBy": "tests/Feature/Http/EntryEditTest.php"
+        },
+        {
+            "id": "D10",
+            "category": "Data integrity",
+            "invariant": "Losing the race to create a shared catalogue book recovers instead of failing",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "D12",
+            "category": "Data integrity",
+            "invariant": "Rating 0 is a real rating and is not the same as unrated",
+            "guardedBy": "tests/Feature/Models/ReadEntryTest.php"
+        },
+        {
+            "id": "E1",
+            "category": "Deployment behaviour",
+            "invariant": "Behind a trusted proxy, generated links use the forwarded scheme and host",
+            "guardedBy": "tests/Feature/Http/BehindProxyTest.php"
+        },
+        {
+            "id": "E2",
+            "category": "Deployment behaviour",
+            "invariant": "Behind https, the session cookie is marked Secure",
+            "guardedBy": "tests/Feature/Http/BehindProxyTest.php"
+        },
+        {
+            "id": "E3",
+            "category": "Deployment behaviour",
+            "invariant": "With no trusted proxy configured, forwarded headers are ignored",
+            "guardedBy": "tests/Feature/Http/BehindProxyTest.php"
+        },
+        {
+            "id": "E4",
+            "category": "Deployment behaviour",
+            "invariant": "The portal prefix headers are validated for shape, never trusted blindly",
+            "guardedBy": "tests/Feature/Http/PortalPrefixTest.php"
+        },
+        {
+            "id": "E5",
+            "category": "Deployment behaviour",
+            "invariant": "The snapshot produces byte-identical output on two runs",
+            "guardedBy": "tests/Feature/Console/SnapshotTest.php"
+        },
+        {
+            "id": "E6",
+            "category": "Deployment behaviour",
+            "invariant": "The snapshot refuses to wipe a directory it did not write",
+            "guardedBy": "tests/Feature/Console/SnapshotTest.php"
+        },
+        {
+            "id": "E7",
+            "category": "Deployment behaviour",
+            "invariant": "The snapshot leaves nothing pointing at localhost",
+            "guardedBy": "tests/Feature/Console/SnapshotTest.php"
+        },
+        {
+            "id": "F1",
+            "category": "Failure tolerance",
+            "invariant": "One book provider failing still returns the other's results",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "F2",
+            "category": "Failure tolerance",
+            "invariant": "Both providers failing returns an empty list, not an error",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "F3",
+            "category": "Failure tolerance",
+            "invariant": "A connection failure is tolerated, not only an error status code",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "F4",
+            "category": "Failure tolerance",
+            "invariant": "A malformed item from a provider is skipped, not fatal to the whole response",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "F5",
+            "category": "Failure tolerance",
+            "invariant": "With no Google Books key, Google is skipped entirely and no request is made",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "F6",
+            "category": "Failure tolerance",
+            "invariant": "An unreachable Ollama makes the ask box fall back to title matching, with a notice",
+            "guardedBy": "tests/Feature/Http/LibraryAskPageTest.php"
+        },
+        {
+            "id": "F7",
+            "category": "Failure tolerance",
+            "invariant": "A save succeeds even when Ollama dies mid-write, leaving the embedding gap to fill later",
+            "guardedBy": "tests/Feature/Ai/EntryEmbedderTest.php"
+        },
+        {
+            "id": "F8",
+            "category": "Failure tolerance",
+            "invariant": "An unreachable Ollama is probed once, then left alone until the cache expires",
+            "guardedBy": "tests/Feature/Ai/EntryEmbedderTest.php"
+        },
+        {
+            "id": "F9",
+            "category": "Failure tolerance",
+            "invariant": "AI search switched off never touches the network",
+            "guardedBy": "tests/Feature/Ai/OllamaClientTest.php"
+        },
+        {
+            "id": "F10",
+            "category": "Failure tolerance",
+            "invariant": "A model that answers with nonsense still shows the ranked entries plus a notice",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "O1",
+            "category": "Ownership",
+            "invariant": "A reader's library contains only that reader's entries",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "O2",
+            "category": "Ownership",
+            "invariant": "Updating another reader's entry is refused and leaves it untouched",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "O3",
+            "category": "Ownership",
+            "invariant": "Deleting another reader's entry is refused",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "O4",
+            "category": "Ownership",
+            "invariant": "Another reader's entry answers 404, never 403, so its existence does not leak",
+            "guardedBy": "tests/Feature/Http/EntryEditTest.php"
+        },
+        {
+            "id": "O5",
+            "category": "Ownership",
+            "invariant": "Account statistics count one reader's entries only",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "O6",
+            "category": "Ownership",
+            "invariant": "The \"have I read this?\" lookup matches the acting reader's titles only",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "O7",
+            "category": "Ownership",
+            "invariant": "The AI search never shows a reader another reader's shelf",
+            "guardedBy": "tests/Feature/Ai/LibraryAskTest.php"
+        },
+        {
+            "id": "O8",
+            "category": "Ownership",
+            "invariant": "The public feed projection exposes no user fields at all",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "P1",
+            "category": "Portability",
+            "invariant": "The whole suite passes on SQLite and on stock PostgreSQL 16",
+            "guardedBy": ".github/workflows/ci.yml",
+            "note": "the postgres job"
+        },
+        {
+            "id": "P2",
+            "category": "Portability",
+            "invariant": "Seeding twice is a no-op on both databases",
+            "guardedBy": "tests/Feature/Database/DemoLibrarySeederTest.php",
+            "note": "and the CI Postgres job"
+        },
+        {
+            "id": "P3",
+            "category": "Portability",
+            "invariant": "Seeding is anchored to a fixed day, so seeding on a later day is still a no-op",
+            "guardedBy": "tests/Feature/Database/DemoLibrarySeederTest.php"
+        },
+        {
+            "id": "P4",
+            "category": "Portability",
+            "invariant": "A non-ASCII title typed exactly as written matches on every database",
+            "guardedBy": "tests/Feature/Services/ReadLogServiceTest.php"
+        },
+        {
+            "id": "P5",
+            "category": "Portability",
+            "invariant": "Nothing but PHP objects goes into the cache, so a serialising store works",
+            "guardedBy": "tests/Feature/Services/PublicFeedCacheTest.php"
+        },
+        {
+            "id": "P6",
+            "category": "Portability",
+            "invariant": "A stored embedding round-trips through a plain JSON text column as floats",
+            "guardedBy": "tests/Feature/Ai/EntryEmbedderTest.php"
+        },
+        {
+            "id": "S1",
+            "category": "Privacy and secrets",
+            "invariant": "The Google Books API key never appears in a log line",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "S2",
+            "category": "Privacy and secrets",
+            "invariant": "The smoke check never prints an API key that appears in an error message",
+            "guardedBy": "tests/Feature/Console/SmokeCheckTest.php"
+        },
+        {
+            "id": "S3",
+            "category": "Privacy and secrets",
+            "invariant": "A provider failure still logs enough to diagnose it",
+            "guardedBy": "tests/Feature/Services/BookSearchServiceTest.php"
+        },
+        {
+            "id": "S4",
+            "category": "Privacy and secrets",
+            "invariant": "The test suite makes no unfaked outbound request",
+            "guardedBy": "tests/Pest.php",
+            "note": "via Http::preventStrayRequests()"
+        },
+        {
+            "id": "S5",
+            "category": "Privacy and secrets",
+            "invariant": "A book description is sanitised before it is rendered",
+            "guardedBy": "tests/Feature/Http/BookSearchPagesTest.php"
+        },
+        {
+            "id": "S6",
+            "category": "Privacy and secrets",
+            "invariant": "An info link that is not http or https is refused",
+            "guardedBy": "tests/Feature/Http/BookSearchPagesTest.php"
+        },
+        {
+            "id": "S7",
+            "category": "Privacy and secrets",
+            "invariant": "Security headers, including the strict CSP, are on every response",
+            "guardedBy": "tests/Feature/Http/SecurityHeadersTest.php"
+        }
+    ]
+}

@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Log;
  * search or the readlog:embed command fills the gap. That is the "app never
  * depends on it" rule from TODO.md made concrete. embed() is that write path
  * and swallows the failure; embedMany() is for callers that want to know.
+ *
+ * .NET counterpart: none, along with the rest of the AI search.
  */
 class EntryEmbedder
 {

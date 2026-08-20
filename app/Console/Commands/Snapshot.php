@@ -48,6 +48,9 @@ use Symfony\Component\Console\Output\NullOutput;
  * with the demo library, never the developer's own, so the output is
  * reproducible from any checkout. Search, forms and the provider lookup are
  * naturally inert in static HTML; a banner on every page says so.
+ *
+ * .NET counterpart: none. The .NET app is hosted, so it never needed a static
+ * copy of itself to serve while the machine is off.
  */
 class Snapshot extends Command
 {
@@ -84,6 +87,19 @@ class Snapshot extends Command
 
     private int $coverFailures = 0;
 
+    /**
+     * The throwaway database's path, unique to this process.
+     *
+     * It used to be a fixed storage/app/snapshot.sqlite, which made the checkout
+     * shared mutable state: two suite runs on one working copy, or `pest
+     * --parallel`, or an IDE watcher running alongside, and one run truncates the
+     * other's file while the other's `finally` deletes it. The symptoms are
+     * "database disk image is malformed" and "no such table: migrations" in
+     * SnapshotTest, on a change that touched nothing near it. A gate that goes red
+     * for reasons unrelated to the diff teaches an agent to ignore red.
+     */
+    private string $databaseFile;
+
     public function handle(Kernel $kernel): int
     {
         $this->out = $this->resolveOut((string) $this->option('out'));
@@ -98,6 +114,10 @@ class Snapshot extends Command
         $this->covers = [];
         $this->assets = [];
         $this->coverFailures = 0;
+
+        // Set before the try, so the finally always has a path to delete even if
+        // prepareDatabase() throws before it gets there.
+        $this->databaseFile = storage_path('app/snapshot-'.getmypid().'-'.bin2hex(random_bytes(4)).'.sqlite');
 
         // Whatever database, cache and session the process was using are put back
         // when the crawl is done. This runs in-process, so leaving the default
@@ -123,7 +143,7 @@ class Snapshot extends Command
             $this->copyAssets();
         } finally {
             DB::purge('snapshot');
-            File::delete(storage_path('app/snapshot.sqlite'));
+            File::delete($this->databaseFile);
             DB::setDefaultConnection($previous['connection']);
             Config::set('database.default', $previous['database.default']);
             Config::set('cache.default', $previous['cache.default']);
@@ -148,7 +168,8 @@ class Snapshot extends Command
      */
     private function prepareDatabase(): void
     {
-        $file = storage_path('app/snapshot.sqlite');
+        // Unique per process, assigned in handle(). See the property's docblock.
+        $file = $this->databaseFile;
         File::ensureDirectoryExists(dirname($file));
         File::put($file, '');
 

@@ -1,0 +1,207 @@
+{
+    "$comment": "Hand written. What each directory holds and the rule that governs code placed in it. The prose form is ARCHITECTURE.md; readlog:docs-check verifies every path here exists.",
+    "name": "readlog-laravel",
+    "description": "A book and reading tracker, migrated from ASP.NET Core Razor Pages to Laravel 13, with a local-model natural-language search over the reader's own entries.",
+    "specification": {
+        "repository": "https://github.com/MikkoNumminen/readlog-dotnet",
+        "note": "The .NET app is the specification. Behaviour that looks odd was ported deliberately and is explained in DECISIONS.md. Do not change it without a new decision entry."
+    },
+    "stack": {
+        "language": "PHP 8.4.1+",
+        "framework": "Laravel 13",
+        "views": "Blade, one plain stylesheet, no build step",
+        "databases": [
+            "sqlite",
+            "pgsql"
+        ],
+        "tests": "Pest 4",
+        "staticAnalysis": "PHPStan level 6 via Larastan",
+        "formatter": "Laravel Pint",
+        "optionalRuntime": "Ollama, for the AI search only",
+        "note": "The locked dependency tree pulls Symfony 8 packages that require PHP 8.4.1. composer.json says ^8.4.1 and declares the required extensions."
+    },
+    "verify": {
+        "command": "composer verify",
+        "steps": [
+            "vendor/bin/pint --test",
+            "vendor/bin/phpstan analyse",
+            "vendor/bin/pest",
+            "php artisan readlog:docs-check"
+        ],
+        "network": false,
+        "approximateSeconds": 20,
+        "note": "20 s with a warm PHPStan result cache, under a minute cold."
+    },
+    "entryPoints": {
+        "agent": "AGENTS.md",
+        "agentClaudeCode": "CLAUDE.md",
+        "architecture": "ARCHITECTURE.md",
+        "contributing": "CONTRIBUTING.md",
+        "invariants": "docs/INVARIANTS.md",
+        "recipes": "docs/RECIPES.md",
+        "glossary": "docs/GLOSSARY.md",
+        "aiFirstScore": "docs/AI-FIRST.md",
+        "decisions": "DECISIONS.md",
+        "migration": "MIGRATION.md",
+        "status": "STATUS.md",
+        "todo": "TODO.md",
+        "demo": "DEMO.md",
+        "humanReadme": "README.md"
+    },
+    "directories": [
+        {
+            "path": "app/Http/Controllers",
+            "holds": "One controller per page, one action per route.",
+            "rule": "Resolve the acting reader, call a service, return a view. No business rules and no queries here.",
+            "dotnetCounterpart": "Pages/*.cshtml.cs page models"
+        },
+        {
+            "path": "app/Http/Middleware",
+            "holds": "RequireDemoUser, SecurityHeaders, PortalPrefix.",
+            "rule": "Cross-cutting request concerns only.",
+            "dotnetCounterpart": "[Authorize] and the inline header middleware in Program.cs"
+        },
+        {
+            "path": "app/Http/Requests",
+            "holds": "Form request validation, and the mapping from validated input to a Support DTO.",
+            "rule": "Every bound the database cannot enforce lives here, including the 0 to 5 rating bound the .NET schema enforces with a check constraint.",
+            "dotnetCounterpart": "Dtos/*.cs with validation attributes"
+        },
+        {
+            "path": "app/Services",
+            "holds": "The reading-log domain and the book providers.",
+            "rule": "Every method takes int $userId as its first argument. Never read the session or the request here; that is what makes the ownership rules testable.",
+            "dotnetCounterpart": "Services/*.cs"
+        },
+        {
+            "path": "app/Services/Ai",
+            "holds": "The three-layer ask pipeline: LibraryQuestion, EntryEmbedder, LibraryAsk, OllamaClient.",
+            "rule": "Every path must degrade visibly when Ollama is absent. The model is shown only rows the database already selected, only for the acting reader, and any id it cites that it was not shown is dropped.",
+            "dotnetCounterpart": "none, this feature was added in the port"
+        },
+        {
+            "path": "app/Services/External",
+            "holds": "One client per book provider.",
+            "rule": "Split into requestSearch() and parseSearch() so Http::pool can send them together. One provider failing must never sink another.",
+            "dotnetCounterpart": "typed HttpClients registered in Program.cs"
+        },
+        {
+            "path": "app/Support",
+            "holds": "Readonly data carriers passed between layers.",
+            "rule": "final readonly classes. No behaviour beyond derived values.",
+            "dotnetCounterpart": "records and DTOs"
+        },
+        {
+            "path": "app/Models",
+            "holds": "Eloquent models.",
+            "rule": "Carry @property docblocks; PHPStan infers attribute types from the columns and is wrong without them.",
+            "dotnetCounterpart": "Models/*.cs entities"
+        },
+        {
+            "path": "app/Casts",
+            "holds": "DateOnly, the stand-in for a type PHP does not have.",
+            "rule": "Dates are stored as Y-m-d with no time component. Laravel's built-in date cast writes a full datetime and would break the uniqueness index.",
+            "dotnetCounterpart": "System.DateOnly"
+        },
+        {
+            "path": "app/Enums",
+            "holds": "Format, a backed enum carrying its own display strings.",
+            "rule": "Stored as the readable name, not an ordinal.",
+            "dotnetCounterpart": "Models/Format.cs plus Models/FormatDisplay.cs"
+        },
+        {
+            "path": "app/Exceptions",
+            "holds": "DuplicateReadEntryException and OllamaUnavailableException.",
+            "rule": "One exception per way a thing can fail, so a caller has exactly one thing to catch and one decision to make. OllamaUnavailableException covers unreachable, refused, timed out and wrong-shaped alike, and the decision is always to degrade.",
+            "dotnetCounterpart": "the exception types thrown by Services/*.cs"
+        },
+        {
+            "path": "app/Providers",
+            "holds": "AppServiceProvider only.",
+            "rule": "register() is deliberately empty: the container auto-wires any concrete class with type-hinted constructor dependencies. boot() holds the two things that need saying, the conditional throttle:ask limiter and the partials.demo-user view composer. Do not bind CurrentUser here; it holds a Session.",
+            "dotnetCounterpart": "the service-registration half of Program.cs"
+        },
+        {
+            "path": "app/Console/Commands",
+            "holds": "readlog:ask, readlog:embed, readlog:smoke, readlog:snapshot, readlog:docs-check.",
+            "rule": "Operator-facing commands. Exit non-zero on failure.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": "database/migrations",
+            "holds": "Hand-written schema migrations.",
+            "rule": "Never edit a committed migration; add a new one. Must run on SQLite and on stock PostgreSQL. No check constraints, which Laravel's schema builder cannot express.",
+            "dotnetCounterpart": "EF Core generated migrations"
+        },
+        {
+            "path": "database/factories",
+            "holds": "Model factories for User, Book and ReadEntry.",
+            "rule": "Tests build rows through factories rather than inline arrays. The .NET suite has no counterpart and builds entities by hand.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": "database/seeders",
+            "holds": "DemoLibrarySeeder: 2 readers, 12 books, 14 reading entries.",
+            "rule": "Idempotent on both databases, and anchored to a fixed day so seeding tomorrow is still a no-op.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": "resources/views",
+            "holds": "Blade templates.",
+            "rule": "No business logic. No inline script tags: the CSP is script-src 'self'. Link by route name, never by literal path, because the app can be served under a path prefix.",
+            "dotnetCounterpart": "Pages/*.cshtml"
+        },
+        {
+            "path": "tests/Feature",
+            "holds": "Everything that needs a database or an HTTP request.",
+            "rule": "RefreshDatabase and Http::preventStrayRequests() are on. An unfaked outbound request fails the test naming the URL.",
+            "dotnetCounterpart": "the xUnit integration suite"
+        },
+        {
+            "path": "tests/Unit",
+            "holds": "Pure tests that need no database.",
+            "rule": "No database, no HTTP.",
+            "dotnetCounterpart": "the xUnit unit suite"
+        },
+        {
+            "path": "config",
+            "holds": "Framework configuration, plus services.php and trustedproxy.php which are this app's own surface.",
+            "rule": "Every env() key read by services.php or trustedproxy.php must appear in .env.example. readlog:docs-check enforces this.",
+            "dotnetCounterpart": "appsettings.json"
+        },
+        {
+            "path": "docs/machine",
+            "holds": "The generated and hand-written JSON facts about this repository.",
+            "rule": "routes.json, commands.json, glossary.json, decisions.json and test-counts.json are generated by readlog:docs-check --write. repo-map.json and invariants.json are hand written and checked.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": "docker",
+            "holds": "The container entrypoint and the nginx configuration.",
+            "rule": "nginx waits 240 s on PHP so the app's own timeouts, not nginx's, decide when a slow AI question fails.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": "ops/desktop",
+            "holds": "A Windows desktop control for starting, stopping and exposing the app.",
+            "rule": "Python stdlib only, so the stock python.exe runs it with nothing installed.",
+            "dotnetCounterpart": "none"
+        },
+        {
+            "path": ".github/workflows",
+            "holds": "CI: the SQLite job, the PostgreSQL job, and the compose job.",
+            "rule": "The PostgreSQL job is the production claim. If it is green, the app runs on any standard PostgreSQL.",
+            "dotnetCounterpart": ".github/workflows/ci.yml in readlog-dotnet"
+        }
+    ],
+    "doNot": [
+        "Add authentication. Its absence is a documented decision.",
+        "Add npm, Vite, or any JavaScript build step.",
+        "Make the Ollama feature required.",
+        "Edit a committed migration.",
+        "Rewrite DECISIONS.md history; append to it.",
+        "Use pgvector or any extension-dependent SQL.",
+        "Let a service method read the session instead of taking a user id.",
+        "Put an inline script tag or an onclick attribute in a template."
+    ]
+}

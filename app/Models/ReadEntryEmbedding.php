@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  * @property list<float> $vector
  * @property Carbon $created_at
  * @property-read ReadEntry $entry
+ *
+ * .NET counterpart: none. There is no embedding table in the source schema.
  */
 class ReadEntryEmbedding extends Model
 {

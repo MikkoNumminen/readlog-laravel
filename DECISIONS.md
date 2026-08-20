@@ -8,6 +8,47 @@ newest phase last. The detailed write-up lives in
 Source of truth for behaviour: [readlog-dotnet](https://github.com/MikkoNumminen/readlog-dotnet),
 read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 
+## Finding a decision
+
+128 entries is past the size where reading down the file works. Look up the topic,
+then search for its numbers.
+
+| Topic | Decisions |
+| --- | --- |
+| Authentication, and why there is none | 7, 8, 9 |
+| Ownership, the demo reader, `CurrentUser` | 8, 9, 28 |
+| Rating: the missing check constraint | 10 |
+| Dates: `DateOnly`, no `updated_at` | 11, 12, 49 |
+| The `Format` enum | 13 |
+| Seed data, factories, idempotency | 14, 15, 18, 49, 50 |
+| Services, DTOs, no interface layer | 19, 20, 21 |
+| Controllers, routing, validation flow | 22, 23, 29 |
+| Views, CSS, error pages | 24, 26 |
+| Security headers, sanitising, redaction | 25, 35, 36, 38 |
+| Edit collisions on the unique index | 27, 91 |
+| Concurrency: pools, savepoints, races | 30, 31, 32, 47, 48, 107 |
+| Book search: providers, merge, failure tolerance | 30, 31, 33, 34, 46 |
+| Tests: live providers, stray requests, race setup | 37, 39, 48 |
+| Static analysis and model docblocks | 92, 93 |
+| CI, and what each job proves | 16, 51, 92 |
+| Docker, compose, nginx, the image | 52 to 59, 105 |
+| Proxies, forwarded headers, cookies | 60, 61, 62 |
+| The tunnel and public exposure | 63, 66, 67, 89, 90, 97 |
+| The smoke check | 64, 65 |
+| The static snapshot | 73 to 80, 84 to 88 |
+| The portal and path prefixes | 109, 110 |
+| The desktop control | 96, 108, 111 |
+| AI search: the three layers | 94, 99, 100, 101, 102 |
+| AI search: parsing, timeouts, rate limits | 103, 104, 105, 106 |
+| Embeddings: storage, staleness, races | 94, 95, 107 |
+| Ollama networking | 98, 108 |
+| Documentation shape and what it leads with | 40, 41, 42, 68, 69, 70, 72 |
+| Agent-facing documentation and the rubric | 112, 113, 120 |
+| Documentation drift checking | 114, 115, 116, 118, 119 |
+| Prompt injection, recorded not fixed | 117 |
+| Test determinism and the environment surface | 121, 122, 125 |
+| Measuring and checking the documentation itself | 123, 124, 126, 127, 128 |
+
 ## Setup
 
 | # | Decision | Reasoning |
@@ -215,3 +256,35 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 109 | The public page serves the live app through a Vercel function, a Tailscale Funnel path mount, and a fallback to the snapshot | The user's requirement: on means the real app at mikkonumminen.dev/readlog-laravel, off means down, and the page must never break. All three funnel ports on the machine are taken by other projects, so readlog gets one path mount (`/readlog-laravel`) on the shared 443 funnel. Measured before building: an unscoped `funnel off` (which the RAG's own control uses) wipes every handler on the port including ours, a scoped `--set-path` add or remove touches only its own path, and the RAG's `--bg 8000` re-assert leaves other paths alone. So the RAG turning itself off degrades this page to the snapshot, never breaks it, and the next readlog `on` re-mounts. |
 | 110 | `PortalPrefix` middleware, driven by two validated headers, not by configuration | The funnel strips the mount path, so the app sees `/library` and must still generate links under `https://mikkonumminen.dev/readlog-laravel`. The proxy function announces where the visitor is with `X-Portal-Host` and `X-Portal-Prefix`; the middleware validates both shapes and forces the root URL and scheme for that request only. Spoofing them changes only the sender's own links, the same power `X-Forwarded-Host` already grants, and nothing is cached. Configuration would have hard-coded the portal into the app; headers keep the app deployable anywhere. |
 | 111 | ReadLog Control's `on` now means everything, `off` means everything readlog owns | On: start Docker Desktop if needed, `docker start` the existing Ollama container (plain start, never compose, so the other project's configuration cannot change), compose up, warm the models, mount the funnel path, confirm the public page serves this machine. Off: unmount the path (scoped), close any tunnel, compose down. Ollama, Docker Desktop and Tailscale are left running, the same hibernation the RAG control uses. |
+
+## Run 5: making the repository legible to an agent
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 112 | An "AI-first" score is defined by a written rubric in `docs/AI-FIRST.md`, not asserted | The goal was "this repo's AI-first score must be at least 9", and no such metric exists to appeal to. A rubric with ten named dimensions, a stated definition, and a scoring method is something a reader can disagree with specifically. A number with no rubric behind it is a mood. |
+| 113 | `AGENTS.md` is the canonical agent contract and `CLAUDE.md` points at it | Two files with overlapping instructions drift apart, and the one that drifts is the one nobody opens. AGENTS.md is vendor-neutral and carries everything; CLAUDE.md holds only what is specific to running Claude Code here, chiefly that PHP is not on this machine's PATH. |
+| 114 | `readlog:docs-check` exists, and it is in `composer verify` rather than only in CI | The command was written after finding README.md claiming 222 tests in one paragraph and 326 in another, with the real number 338, wrong in two files across two pull requests, with nothing to notice. A documentation claim that nothing checks is a claim that will be false. Putting it in the local gate rather than only in CI means the failure arrives while the author still has the context to fix it. |
+| 115 | `docs-check` deliberately does not run the test suite | A suite that counts itself proves nothing: whatever it reports becomes the recorded number, and the two agree by construction. The statically countable facts (test files, test blocks) are checked here; the suite's own case and assertion totals are compared against `docs/machine/test-counts.json` by a CI step, from outside, against the run that just happened. |
+| 116 | Invariants are written as prose with a guarding test named per row, and mirrored as JSON | The enforcement already existed and was unusually good; only the index was missing, so this was transcription rather than engineering. The JSON is what tooling reads, the prose is what a person reads, and `docs-check` fails when they list different ids. What it cannot check is that a test still asserts what its row claims, and it says so rather than implying otherwise. |
+| 117 | The prompt-injection weakness in the AI search is documented rather than fixed in this run | `ARCHITECTURE.md` now states plainly that book titles reach the model prompt with no data and instruction fencing, that a successful injection can make the model emit arbitrary prose, and that it still cannot reach data outside the eight entries shown or write anything. Fixing it is a behaviour change to the prompt and deserves its own run with its own adversarial fixture; recording it is what this repository does with known gaps. Added to TODO.md. |
+| 118 | Only `config/services.php` and `config/trustedproxy.php` are held to "every env key is documented" | Stock Laravel configuration reads far more environment variables than any application documents, and listing them would bury the seventeen that matter here. The check found all seventeen genuinely undocumented ones, including every Ollama timeout, which were measured values explained in code comments that a reader of `.env.example` could not see. |
+| 119 | The em dash count is a build failure, not a style note | Zero appear in any document in this repository, the check costs nothing, and it is the single strongest tell that prose was generated rather than written. A convention that is enforced is a convention; one that is remembered is a preference. |
+| 120 | Three graders with different biases score the rubric, and the mean is the score | One model scoring its own repository grades generously and consistently. A strict grader who treats absence as near-zero, a practical grader who credits good prose under an unconventional filename, and a tooling grader who weights what CI actually enforces disagree enough to be worth averaging. Their baseline spread was 4.4 to 5.1 on a repository that felt finished. |
+
+### Found by scoring the repository against the rubric
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 121 | The snapshot's throwaway database is per-process, not a fixed path | `storage_path('app/snapshot.sqlite')` was created by truncation and deleted in a `finally`, which made the checkout shared mutable state: two suite runs on one working copy, `pest --parallel`, or an IDE watcher, and one run truncates the other's file while the other deletes it. Two independent graders reproduced it and measured the suite red on roughly a third of runs; both correctly called the verification loop non-deterministic, which is the one property it cannot lack. Now `snapshot-<pid>-<random>.sqlite`, assigned before the `try` so the `finally` always has a path. Two concurrent full suites now pass. |
+| 122 | `composer.json` says `^8.4.1`, not `^8.3`, and declares its extensions | The claim of 8.3 was false: 17 locked Symfony 8 packages require 8.4.1, so a fresh clone on 8.3 fails at `composer install`. Nobody had run that combination. The extension list existed only inside the CI workflow and a Dockerfile comment, so a missing `ext-dom` surfaced as a confusing failure much later instead of at install. `pdo_sqlite` and `pdo_pgsql` are suggested rather than required, because the Postgres CI job installs only one of them. |
+| 123 | `docs-check` checks counted claims and link anchors | Two documents said the decision log held 111 and 115 entries when it held 120, and the checker printed "Documentation matches the repository." A count is the easiest claim to check and the easiest to leave behind. Anchors were being stripped before the path was resolved, so a link to a renamed heading resolved happily and landed the reader at the top of the file. Both checks were written by first reproducing the miss. |
+| 124 | The score in `docs/AI-FIRST.md` is the measured one, including the dimensions that are not 10 | The first draft of that file carried invented per-dimension numbers written before anything was measured. Publishing a rubric and then filling it in with a guess is worse than having no rubric. The recorded score is the mean of three graders who ran the gate themselves, and the gaps they found that are still open are listed rather than removed. |
+
+### Found by the second scoring round
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 125 | The second flake in `SnapshotTest` is fixed by asserting on "answered 405", not on "405" | `snapshotDir()` embeds `getmypid()` and the command prints that path back, so `doesntExpectOutputToContain('405')` failed for any pest process whose pid happened to contain 405. A grader hit it on their first run and worked out the mechanism; roughly one run in two hundred. The same class of bug as decision 121 and in the same file: a test coupled to something that varies per process. The command's real message is "{url} answered 405; skipped", so matching that phrase keeps the assertion's meaning and drops the coincidence. |
+| 126 | The CI test-count step reads the first `<testsuite>`, not the `<testsuites>` root | It was written to read the root's `tests` attribute, and PHPUnit does not put one there, so the step would have compared `None` against 347 and failed every run. It had never executed, which is exactly how a check written and not run goes wrong. Verified now by running the suite with `--log-junit` and executing the comparison by hand. |
+| 127 | All 48 classes under `app/` name a .NET counterpart or say they have none | CONTRIBUTING.md asserted this as an existing convention and nine files did not follow it, mostly the AI search and the snapshot command. Adding the line was cheaper than weakening the claim, and "none" carries real information here, because it marks precisely what this port added rather than ported. |
+| 128 | `docs-check` reads counts written as words as well as digits | The recipe count is written "nine", and the first version of the check only matched digits, so it passed a deliberately wrong "twelve" without complaint. A check that covers half the claims it appears to cover is worse than no check, because it is trusted. |

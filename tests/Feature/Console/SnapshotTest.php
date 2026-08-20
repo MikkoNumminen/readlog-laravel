@@ -80,8 +80,12 @@ it('maps the default grid view and ?view=grid to the same page', function () {
 it('rewrites form actions but never fetches them as pages', function () {
     fakeCovers();
 
+    // "answered 405", not a bare "405": snapshotDir() carries getmypid() and the
+    // command prints that path back, so a bare substring made the suite red for
+    // any pest process whose pid happened to contain 405. Rare, real, and the
+    // second flake found in this file; see decision 121 for the first.
     $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])
-        ->doesntExpectOutputToContain('405')
+        ->doesntExpectOutputToContain('answered 405')
         ->assertExitCode(0);
 
     $edit = File::get(File::glob(snapshotDir().'/library/*/edit/index.html')[0]);

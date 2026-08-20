@@ -4,12 +4,13 @@
 # `migrate` step because Laravel has no compile stage that would catch a broken
 # migration.
 #
-# Two jobs. `sqlite` is the developer's loop, exactly what `vendor/bin/pest` does
-# on a laptop. `postgres` is the production claim: the whole migrate, seed and
-# test cycle against a stock postgres:16 service container, configured through
-# nothing but the six DB_* variables documented in .env.example. If that job is
-# green, the app comes up on any standard Postgres, not on one provider's flavour
-# of it.
+# Three jobs. `sqlite` is the developer's loop, exactly what `vendor/bin/pest` does
+# on a laptop, plus the documentation drift check. `postgres` is the production
+# claim: the whole migrate, seed and test cycle against a stock postgres:16 service
+# container, configured through nothing but the six DB_* variables documented in
+# .env.example. If that job is green, the app comes up on any standard Postgres,
+# not on one provider's flavour of it. `compose` is the "fresh clone to running
+# app" claim, checked from a bare checkout.
 name: CI
 
 on:
@@ -46,6 +47,13 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: The composite gate
+        # `composer verify` is the command AGENTS.md tells every contributor and
+        # every agent is the definition of done, so CI runs that command rather
+        # than an open-coded copy of its four steps. If the two could drift, the
+        # instruction would eventually be wrong.
+        run: composer verify
+
       - name: Check formatting
         run: vendor/bin/pint --test
 
@@ -60,7 +68,38 @@ jobs:
           php artisan migrate --force --seed
 
       - name: Run the test suite
-        run: vendor/bin/pest
+        run: vendor/bin/pest --log-junit /tmp/junit.xml
+
+      - name: Documentation matches the repository
+        # readlog:docs-check verifies the claims the docs make: every relative link
+        # resolves, every path and route named in prose exists, docs/machine/*.json
+        # is not stale, and every env key config/services.php reads is documented.
+        run: php artisan readlog:docs-check
+
+      - name: The documented test counts are the real ones
+        # docs-check deliberately does not run the suite: a suite that counts itself
+        # proves nothing. This step closes that loop from outside, against the run
+        # that just happened.
+        run: |
+          # PHPUnit puts the totals on the first <testsuite> child, not on the
+          # attribute-less <testsuites> root. Reading the root yields None, which
+          # would fail this step unconditionally against every run.
+          totals='import xml.etree.ElementTree as E,sys; r=E.parse("/tmp/junit.xml").getroot(); s=r if r.get("tests") else r[0]; print(s.get(sys.argv[1]))'
+          cases=$(python3 -c "$totals" tests)
+          assertions=$(python3 -c "$totals" assertions)
+          recorded_cases=$(python3 -c "import json;print(json.load(open('docs/machine/test-counts.json'))['cases'])")
+          recorded_assertions=$(python3 -c "import json;print(json.load(open('docs/machine/test-counts.json'))['assertions'])")
+          echo "ran cases=$cases assertions=$assertions; recorded cases=$recorded_cases assertions=$recorded_assertions"
+          if [ "$cases" != "$recorded_cases" ]; then
+            echo "docs/machine/test-counts.json is stale. Update it and any prose quoting these numbers." >&2
+            exit 1
+          fi
+          # Assertions are reported, not enforced: several tests iterate over the
+          # documentation itself, so the total moves when a doc is added or a table
+          # row changes, which is not drift worth failing a build over.
+          if [ "$assertions" != "$recorded_assertions" ]; then
+            echo "note: assertion total moved from $recorded_assertions to $assertions"
+          fi
 
       - name: Generate the static snapshot end to end
         # The tests fake the cover downloads; this run does not, so it also proves

@@ -17,6 +17,8 @@ use Illuminate\Support\Collection;
  *
  * `applied` is the deterministic layer's account of itself ("audiobooks",
  * "rated 5"), shown so the reader can see what the answer was narrowed to.
+ *
+ * .NET counterpart: none, along with the rest of the AI search.
  */
 final readonly class AskResult
 {

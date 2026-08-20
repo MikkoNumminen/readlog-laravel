@@ -65,7 +65,7 @@ class CurrentUser
     /**
      * The acting user's id.
      *
-     * Callers are behind the require.demo.user middleware, so a user always exists
+     * Callers are behind the demo.user middleware, so a user always exists
      * by the time this runs; a missing one is a programming error, which is the same
      * contract the .NET GetUserId() extension states.
      */

@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
  * one here needs a rating word or a date word next to the number ("at least 4
  * stars", not "at least 4 books"), each is a phrase a person actually types,
  * and each is pinned by a test, the misses included.
+ *
+ * .NET counterpart: none, along with the rest of the AI search.
  */
 final readonly class LibraryQuestion
 {

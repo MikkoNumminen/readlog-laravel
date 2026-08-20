@@ -1,0 +1,39 @@
+{
+    "artisan": {
+        "readlog:ask": "Ask a reader's library a question through Ollama, or warm the models up",
+        "readlog:docs-check": "Verify that the documentation still matches the repository, and regenerate docs/machine/",
+        "readlog:embed": "Compute embeddings for reading entries that lack a current one (needs Ollama)",
+        "readlog:smoke": "Verify a running ReadLog instance: health route, home page, database, migrations, demo data, providers",
+        "readlog:snapshot": "Write a static, browsable snapshot of the seeded app to a directory"
+    },
+    "composer": {
+        "analyse": [
+            "@php vendor/bin/phpstan analyse --memory-limit=1G"
+        ],
+        "dev": [
+            "@php artisan serve"
+        ],
+        "docs-check": [
+            "@php artisan readlog:docs-check"
+        ],
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force --seed"
+        ],
+        "snapshot": [
+            "@php artisan readlog:snapshot"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test"
+        ],
+        "verify": [
+            "@php vendor/bin/pint --test",
+            "@php vendor/bin/phpstan analyse --memory-limit=1G",
+            "@php vendor/bin/pest",
+            "@php artisan readlog:docs-check"
+        ]
+    }
+}

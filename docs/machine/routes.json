@@ -1,0 +1,107 @@
+[
+    {
+        "method": "GET",
+        "uri": "/",
+        "name": "feed",
+        "action": "App\\Http\\Controllers\\FeedController@index",
+        "middleware": [
+            "web"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/account",
+        "name": "account.show",
+        "action": "App\\Http\\Controllers\\AccountController@show",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/book",
+        "name": "book.show",
+        "action": "App\\Http\\Controllers\\BookController@show",
+        "middleware": [
+            "web"
+        ]
+    },
+    {
+        "method": "POST",
+        "uri": "/demo-user",
+        "name": "demo-user.update",
+        "action": "App\\Http\\Controllers\\DemoUserController@update",
+        "middleware": [
+            "web"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/library",
+        "name": "library.index",
+        "action": "App\\Http\\Controllers\\LibraryController@index",
+        "middleware": [
+            "web",
+            "demo.user",
+            "throttle:ask"
+        ]
+    },
+    {
+        "method": "DELETE",
+        "uri": "/library/{entry}",
+        "name": "entries.destroy",
+        "action": "App\\Http\\Controllers\\ReadEntryController@destroy",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "PUT",
+        "uri": "/library/{entry}",
+        "name": "entries.update",
+        "action": "App\\Http\\Controllers\\ReadEntryController@update",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/library/{entry}/edit",
+        "name": "entries.edit",
+        "action": "App\\Http\\Controllers\\ReadEntryController@edit",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/log",
+        "name": "log.create",
+        "action": "App\\Http\\Controllers\\LogController@create",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "POST",
+        "uri": "/log",
+        "name": "log.store",
+        "action": "App\\Http\\Controllers\\LogController@store",
+        "middleware": [
+            "web",
+            "demo.user"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/up",
+        "name": "",
+        "action": "Closure",
+        "middleware": []
+    }
+]
