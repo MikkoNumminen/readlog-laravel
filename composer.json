@@ -17,7 +17,6 @@
         "ext-mbstring": "*",
         "ext-pdo": "*",
         "ext-xml": "*",
-        "ext-zip": "*",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "symfony/html-sanitizer": "^8.1"
@@ -123,6 +122,7 @@
         "snapshot": "Write the static snapshot to build/snapshot/."
     },
     "suggest": {
+        "ext-zip": "Only for the development toolchain; Composer prefers it over the unzip binary. The runtime image does not have it and does not need it.",
         "ext-pdo_sqlite": "Required for the default SQLite connection, which is what a fresh clone and the test suite use.",
         "ext-pdo_pgsql": "Required to run against PostgreSQL instead. Set DB_CONNECTION=pgsql; see .env.example.",
         "ext-intl": "Not used by the app, but Laravel enables extra formatting when present."

@@ -10,7 +10,7 @@ read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 
 ## Finding a decision
 
-128 entries is past the size where reading down the file works. Look up the topic,
+129 entries is past the size where reading down the file works. Look up the topic,
 then search for its numbers.
 
 | Topic | Decisions |
@@ -46,7 +46,7 @@ then search for its numbers.
 | Agent-facing documentation and the rubric | 112, 113, 120 |
 | Documentation drift checking | 114, 115, 116, 118, 119 |
 | Prompt injection, recorded not fixed | 117 |
-| Test determinism and the environment surface | 121, 122, 125 |
+| Test determinism and the environment surface | 121, 122, 125, 129 |
 | Measuring and checking the documentation itself | 123, 124, 126, 127, 128 |
 
 ## Setup
@@ -288,3 +288,4 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 126 | The CI test-count step reads the first `<testsuite>`, not the `<testsuites>` root | It was written to read the root's `tests` attribute, and PHPUnit does not put one there, so the step would have compared `None` against 347 and failed every run. It had never executed, which is exactly how a check written and not run goes wrong. Verified now by running the suite with `--log-junit` and executing the comparison by hand. |
 | 127 | All 48 classes under `app/` name a .NET counterpart or say they have none | CONTRIBUTING.md asserted this as an existing convention and nine files did not follow it, mostly the AI search and the snapshot command. Adding the line was cheaper than weakening the claim, and "none" carries real information here, because it marks precisely what this port added rather than ported. |
 | 128 | `docs-check` reads counts written as words as well as digits | The recipe count is written "nine", and the first version of the check only matched digits, so it passed a deliberately wrong "twelve" without complaint. A check that covers half the claims it appears to cover is worse than no check, because it is trusted. |
+| 129 | Only the extensions the runtime actually needs are required; `ext-zip` is a suggestion | Declaring `ext-zip` broke the Docker build on the first CI run of this branch: `php:8.4-fpm-alpine` has no zip extension and `composer install --no-dev` refused. No production package in the lockfile requires it; Composer wants it for itself, and the Dockerfile already installs the `unzip` binary for that. The required list is now `curl`, `dom`, `fileinfo`, `mbstring`, `pdo` and `xml`, every one of which the base image has. The failure was the new declaration working correctly: it named a mismatch between what the app claimed to need and what its own production image provides. |

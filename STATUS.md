@@ -323,7 +323,7 @@ the repository rather than reading it: a fixed-path temp database that made the
 suite red on roughly a third of runs, a PHP version constraint that was two minor
 versions too low for the committed lockfile, a test assertion that collided with
 process ids containing "405", and a CI step that read the wrong XML node and would
-have failed every run. Decisions 121 to 128.
+have failed every run. Decisions 121 to 129.
 
 The agent-facing surface it guards is `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`,
 `CONTRIBUTING.md`, `docs/INVARIANTS.md` (59 invariants, each naming its guarding

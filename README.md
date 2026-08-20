@@ -140,8 +140,9 @@ To put the running app on a temporary public URL, `scripts/tunnel-up.sh` (and
 ### With PHP on the host
 
 - PHP 8.4.1 or newer, with `pdo_sqlite`, `sqlite3`, `mbstring`, `curl`, `fileinfo`,
-  `dom`, `xml` and `zip`. The extensions are declared in `composer.json`, so
-  `composer install` says which one is missing rather than failing later
+  `dom` and `xml`. Those are declared in `composer.json`, so `composer install`
+  names the missing one rather than failing later. `zip` is wanted by Composer
+  itself and by the dev toolchain, but the app does not need it at runtime
 - [Composer](https://getcomposer.org/)
 
 ```bash

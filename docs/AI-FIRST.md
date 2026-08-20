@@ -85,7 +85,7 @@ file, where an assertion on the bare string "405" collided with any process id
 containing 405. A CI step that read the wrong XML node and would have failed every
 run it was ever part of. Nine classes not following a convention the contributing
 guide asserted as universal. And a count check that only matched digits, so it
-passed a deliberately wrong number written as a word. Decisions 125 to 128.
+passed a deliberately wrong number written as a word. Decisions 125 to 129.
 
 None of those would have been found by reading the repository. All of them were
 found by running it and comparing the result to what it says about itself, which is

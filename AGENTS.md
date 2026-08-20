@@ -89,7 +89,7 @@ Then `php artisan serve` for the app on <http://localhost:8000>, or
 Every change in this repository takes the same eight steps. If you are unsure what
 to do next, you are somewhere in this list.
 
-1. **Search `DECISIONS.md` first.** 128 numbered entries with a topic index at the
+1. **Search `DECISIONS.md` first.** 129 numbered entries with a topic index at the
    top. If a decision covers the behaviour you are about to change, you are
    changing a decision, not fixing a bug.
 2. **Branch.** Never commit to `main`.
@@ -202,7 +202,7 @@ repository itself, and the check fails when they are stale:
 - `routes.json`: every route, verb, name, middleware and controller action
 - `commands.json`: every artisan command and every composer script
 - `glossary.json`: the domain vocabulary, from `docs/GLOSSARY.md`
-- `decisions.json`: all 128 decisions and the topic index, from `DECISIONS.md`
+- `decisions.json`: all 129 decisions and the topic index, from `DECISIONS.md`
 - `test-counts.json`: test files and test blocks, counted statically. The suite's
   own case total is compared against this by CI, after a real run
 
