@@ -844,12 +844,12 @@
         {
             "id": 141,
             "decision": "The first audit run kept zero of 121 candidates, and the report says why a zero is credible here",
-            "reasoning": "Every candidate matched a documented counter-example, most of them this repo's own recorded past bugs; the judges cite the exact code they cleared rather than waving groups through, and four earlier review passes had already fixed precisely these shapes. The run also caught a bug in its own pre-pass: `git grep` patterns beginning with `->` were parsed as command options and silently zeroed five checks, caught because a zero on `$request->query(` was impossible. Recorded in the skill's failure modes: a zero from a tool is a claim to verify, not a fact."
+            "reasoning": "Every candidate matched a documented counter-example, most of them this repo's own recorded past bugs; the judges cite the exact code they cleared rather than waving groups through, and four earlier review passes had already fixed precisely these shapes. The run also caught a bug in its own pre-pass: five `git grep` patterns beginning with `->` were parsed as command options, silently zeroing six checks (one seed serves both B1 and B2), caught because a zero on `$request->query(` was impossible. Recorded in the skill's failure modes: a zero from a tool is a claim to verify, not a fact."
         },
         {
             "id": 142,
             "decision": "The skill gains an opt-in `--prs` phase: findings become area-named branches, each PR machine-reviewed, review findings fixed before handover",
-            "reasoning": "The read-only default stays, and a zero-finding run lands nothing. The phase exists because the audit loop in this repository has never actually ended at a defect list: every audit pass so far (PRs 9, 20, 24) ended in a reviewed PR whose review found more than the audit did, twice including bugs in the audit's own fixes. Naming that ending in the procedure makes it happen by rule rather than by memory. Merging stays human, always."
+            "reasoning": "The read-only default stays, and a zero-finding run lands nothing. The phase exists because the audit loop in this repository has never actually ended at a defect list: every review pass so far (PRs 9, 12, 20, 24) ended in a reviewed PR whose review found more than the pass itself did, twice including bugs in that pass's own fixes. Naming that ending in the procedure makes it happen by rule rather than by memory. Merging stays human, always."
         }
     ]
 }

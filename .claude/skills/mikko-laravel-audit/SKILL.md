@@ -301,7 +301,7 @@ Run from the repo root; capture output off-context; skip cleanly with a one-line
 
 ### Phase 1.5 — candidate gathering (deterministic, no AI tokens)
 
-`git grep -nE` over tracked files (which already excludes `vendor/` and `storage/` via .gitignore), one pass per seed pattern, scoped to the paths shown. Collect `{check, file:line, matched text}`, build the map grouped A–E, record per-check counts, and **gate dispatch**: a group with zero candidates is not dispatched.
+`git grep -nE -e "<pattern>" -- <paths>` over tracked files (which already excludes `vendor/` and `storage/` via .gitignore), one pass per seed pattern, scoped to the paths shown. **The `-e` is mandatory, not style**: five seeds begin with `->`, and without `-e` git grep parses them as options and yields a silent zero — the first run shipped exactly this bug and lost six checks to it until an impossible zero (on `$request->query(`, which exists in any Laravel controller) exposed it. Double-quote patterns for the shell; the C4 seed uses a `.` wildcard precisely so no seed has to embed a quote. Collect `{check, file:line, matched text}`, build the map grouped A–E, record per-check counts, and **gate dispatch**: a group with zero candidates is not dispatched.
 
 | Check | Seed (`git grep -nE`) | Scope | Judge narrows on |
 | --- | --- | --- | --- |
@@ -310,6 +310,7 @@ Run from the repo root; capture output off-context; skip cleanly with a one-line
 | A3 | `\bsession\(\|\brequest\(\|\bauth\(\|Session::\|Auth::` | `app/Services/ app/Support/ app/Models/` | not CurrentUser; not constructor-injected contracts |
 | A4 | `Config::set\|config\(\[` | `app/` | no save+restore in finally |
 | B1 | `->get\(\)\|::all\(\)` | `app/` | relation walked per-row downstream w/o with() |
+| B1 (Blade) | `->[a-z_]+->` | `resources/views/` | a relation chain echoed inside a loop |
 | B2 | `->get\(\)\|::all\(\)` | `app/` | growable table, no bound, no decision cover |
 | B3 | `->all\(\)\|guarded\|forceFill` | `app/` | request-fed, not validated()/DTO |
 | B4 | `DB::raw\|whereRaw\|selectRaw\|orderByRaw\|havingRaw\|statement\(` | `app/ database/` | variable interpolated vs `?` bindings |
@@ -317,7 +318,7 @@ Run from the repo root; capture output off-context; skip cleanly with a one-line
 | B6 | `strftime\|ILIKE\|json_extract\|::text\|::date\|RANDOM\(\)` | `app/ database/` | engine-specific behaviour |
 | C1, C2 | `Http::` | `app/` | timeout absent; body read unguarded |
 | C3 | `Log::` | `app/` | message can embed a credentialled URL |
-| C4 | `file_get_contents\('http\|curl_init\|new Client\(` | `app/ tests/` | bypasses the Http facade |
+| C4 | `file_get_contents\(.http\|curl_init\|new Client\(` | `app/ tests/` | bypasses the Http facade |
 | D1 | `\{!!` | `resources/views/` | value not sanitised upstream |
 | D2 | `Route::get` | `routes/` | handler writes state |
 | D3 | `::find\(\|findOrFail\(` | `app/` | owned table, no user_id scope |
@@ -341,11 +342,11 @@ Append to every subagent prompt:
 
 ### Phase 3 — aggregated report
 
-Write `docs/audits/laravel-<YYYY-MM-DD>.md` (create the directory if absent; suffix `-v2` on a same-date collision — never overwrite). Recount the severity tally so the summary matches the body exactly. **Then run `php artisan readlog:docs-check`** and fix the report until the gate passes.
+Write `docs/audits/laravel-<YYYY-MM-DD>.md` (create the directory if absent; suffix `-v2` on a same-date collision — never overwrite). Recount the severity tally so the summary matches the body exactly. The report lands in the audited tree's own `docs/audits/`. **Then run the documentation gate**: in this repository that is `php artisan readlog:docs-check`, fixed until it passes. On another Laravel tree (`--source` elsewhere) that command does not exist; run that repo's own docs gate if it has one, otherwise skip the step and record the skip on the report's Coverage line.
 
 ### Phase 4 — reviewed fix PRs (opt-in, `--prs`)
 
-By default the skill stops at the report. With `--prs`, it carries the findings the rest of the way — because in this repository the audit loop has never actually ended at a defect list: every audit pass so far (PRs 9, 20, 24) ended in a reviewed PR whose review found more than the audit did. This phase names that ending so it happens by procedure, not by memory.
+By default the skill stops at the report. With `--prs`, it carries the findings the rest of the way — because in this repository the audit loop has never actually ended at a defect list: every review pass so far (PRs 9, 12, 20, 24) ended in a reviewed PR whose review found more than the pass itself did. This phase names that ending so it happens by procedure, not by memory.
 
 Runs **only when Phase 3 recorded findings**; on a zero-finding run there is nothing to land and the phase reports exactly that (the audit's own artifacts — a new report, a changed skill — still land through this same loop, driven by the operator rather than the flag).
 
@@ -362,7 +363,7 @@ If the review loop finds a defect in the *skill's own checks* (a check that shou
 ## Output schema
 
 ````markdown
-# Laravel audit — {YYYY-MM-DD}
+# Laravel audit, {YYYY-MM-DD}
 
 ## Summary
 - Commit audited: `<sha>` on branch `<branch>`
@@ -377,6 +378,11 @@ If the review loop finds a defect in the *skill's own checks* (a check that shou
 ## Static analysis
 {Phase 1 per-tool status}
 
+## How each group cleared
+{required on a zero-finding run, recommended always: per group, what the judge
+verified and which counter-example each notable candidate matched. This section
+is what makes a zero auditable; without it a clean run is just an assertion.}
+
 ## Findings by area
 ### A: container, configuration and composition
 - `app/....php:NN` [severity] A1 env-outside-config: description
@@ -387,6 +393,9 @@ If the review loop finds a defect in the *skill's own checks* (a check that shou
 
 ## Recommended next steps
 {grouped by severity, critical first; suggest area-named fix branches}
+
+## Process notes
+{any deviation, tooling bug, or lesson from this run; omit only if truly none}
 
 ## What is verifiable vs editorial
 {the standard table}
@@ -408,8 +417,9 @@ If the review loop finds a defect in the *skill's own checks* (a check that shou
 
 ## Failure modes
 
+- **A zero from a tool is a claim to verify, not a fact.** The first run's candidate pass silently zeroed six checks: five seed patterns begin with `->` and git grep parsed them as command options. The tell was a zero on a pattern that could not be zero. Phase 1.5 now mandates `-e`, and any surprising zero-candidate check must be re-verified against a known call site before its group is skipped.
 - **`git grep` misses untracked new files.** Files added but never `git add`ed escape the candidate pass; `git status` in the pre-flight notes any untracked PHP so the reader knows.
-- **Blade seeds under-detect computed N+1.** Relation chains built in PHP variables before the loop won't match the Blade seed; group B judges the `->get()` sites too, which covers most of it.
+- **The Blade N+1 seed sees echoed chains only.** `->[a-z_]+->` in `resources/views/` catches a relation chain echoed in a template; a chain assembled in a PHP variable before the loop, or a lazy load reached through a candidate-free call path, still escapes. Group B's judgment of the `->get()` sites covers most of the rest.
 - **Heuristic matching.** Ownership scoping (D3) and singleton statefulness (A2) need the auditor to connect a call site to a class definition — expect occasional false positives; the counter-example column tells the reader when a hit is fine.
 - **Octane/queue-worker lifetimes.** This skill assumes php-fpm's request-per-process model (what this repo runs). Long-lived worker hazards (static leaks, container bleed) are out of v1 scope.
 
@@ -429,25 +439,30 @@ If the review loop finds a defect in the *skill's own checks* (a check that shou
 [[check]]
 kind = "file_contains"
 path = "SKILL.md"
+root = "skill_dir"
 pattern = "env-outside-config"
 
 [[check]]
 kind = "file_contains"
 path = "SKILL.md"
+root = "skill_dir"
 pattern = "pre-flight"
 
 [[check]]
 kind = "file_contains"
 path = "SKILL.md"
+root = "skill_dir"
 pattern = "candidate gathering"
 
 [[check]]
 kind = "file_contains"
 path = "SKILL.md"
+root = "skill_dir"
 pattern = "DECISIONS.md is the spec"
 
 [[check]]
 kind = "file_contains"
 path = "SKILL.md"
+root = "skill_dir"
 pattern = "reviewed fix PRs"
 ```
