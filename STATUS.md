@@ -139,7 +139,7 @@ Self-review found the scripts committed without their executable bit (Git on
 Windows does not record it), a stale `.tunnel-url` that could have been copied
 into the image, and three tests that were wrong when first written.
 
-### Pull requests 8 to 26, in one table
+### Pull requests 8 to 28, in one table
 
 Later runs were smaller and are recorded here in one line each; every PR carries
 its own self-review.
@@ -165,6 +165,8 @@ its own self-review.
 | [24](https://github.com/MikkoNumminen/readlog-laravel/pull/24) | Making the repository legible to a coding agent: ARCHITECTURE.md, AGENTS.md, CONTRIBUTING.md, invariants, recipes, glossary, `docs/machine/*.json`, and `readlog:docs-check` in `composer verify` and CI. |
 | [25](https://github.com/MikkoNumminen/readlog-laravel/pull/25) | ARCHITECTURE.md names the `X-ReadLog-App` header the PR 23 and 24 merge introduced, a drift `readlog:docs-check` cannot see. |
 | [26](https://github.com/MikkoNumminen/readlog-laravel/pull/26) | A project-local Laravel audit skill (the `mikko-*` suite is PHP-blind), its first run (121 candidates, zero findings), and its opt-in reviewed-fix-PR phase. |
+| [27](https://github.com/MikkoNumminen/readlog-laravel/pull/27) | The audit's grunt work becomes a bundled script: `laravel-audit.py` runs the pre-flight and all seed greps in one call, patterns passed as data so git cannot eat them, failures surfaced per check instead of silent zeros. |
+| [28](https://github.com/MikkoNumminen/readlog-laravel/pull/28) | Bookkeeping for PR 27, kept separate so that PR stays skill-only: decision 143 and these table rows. |
 
 ## Hosting: what is automated and what is manual
 

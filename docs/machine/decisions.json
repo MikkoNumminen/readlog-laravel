@@ -1,7 +1,7 @@
 {
     "$comment": "Generated from DECISIONS.md by readlog:docs-check --write. Append-only; never renumber.",
     "source": "DECISIONS.md",
-    "count": 142,
+    "count": 143,
     "topicIndex": [
         {
             "topic": "Authentication, and why there is none",
@@ -137,7 +137,7 @@
         },
         {
             "topic": "The project-local Laravel audit skill",
-            "decisions": "140, 141, 142"
+            "decisions": "140, 141, 142, 143"
         }
     ],
     "decisions": [
@@ -850,6 +850,11 @@
             "id": 142,
             "decision": "The skill gains an opt-in `--prs` phase: findings become area-named branches, each PR machine-reviewed, review findings fixed before handover",
             "reasoning": "The read-only default stays, and a zero-finding run lands nothing. The phase exists because the audit loop in this repository has never actually ended at a defect list: every review pass so far (PRs 9, 12, 20, 24) ended in a reviewed PR whose review found more than the pass itself did, twice including bugs in that pass's own fixes. Naming that ending in the procedure makes it happen by rule rather than by memory. Merging stays human, always."
+        },
+        {
+            "id": 143,
+            "decision": "The audit's deterministic phases ship as a bundled stdlib script, not as prose the model re-executes",
+            "reasoning": "Phases 0 and 1.5 need no judgement, yet the model was re-composing ~20 grep invocations per run, which is neither deterministic nor cheap, and the first run proved it by mis-quoting its own greps. `laravel-audit.py` does the fit check and every seed grep in one call, invoking git grep as an argument vector with `-e` and `--` so the dash-leading-pattern bug class cannot exist, and reporting a failed grep as an ERROR line on that check instead of a silent zero. The script's seed dict is the executable source of truth; SKILL.md's table documents it and serves as the python-less fallback, and the freshness check pins marker seeds in both so drift is caught. Same token-economy standard the other mikko skills hold themselves to."
         }
     ]
 }
