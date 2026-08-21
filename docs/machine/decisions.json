@@ -1,7 +1,7 @@
 {
     "$comment": "Generated from DECISIONS.md by readlog:docs-check --write. Append-only; never renumber.",
     "source": "DECISIONS.md",
-    "count": 138,
+    "count": 139,
     "topicIndex": [
         {
             "topic": "Authentication, and why there is none",
@@ -826,6 +826,11 @@
             "id": 138,
             "decision": "The cleanup test asserts on this process's own file, not on the directory",
             "reasoning": "Three forms were tried. The old fixed path passed with the cleanup deleted. An empty-directory assertion failed on a file a killed run had left. A before-and-after difference failed on another concurrent suite's snapshot still in flight. Globbing `snapshot-<own pid>-*` is the only one that is both sensitive to the regression and blind to every other process."
+        },
+        {
+            "id": 139,
+            "decision": "`ARCHITECTURE.md` describes `X-ReadLog-App` alongside the security headers, and says it is not one",
+            "reasoning": "PR 23 added the header to `SecurityHeaders` while PR 24 was open, so the merge of the two left the middleware setting a header the architecture document did not mention. `docs-check` cannot catch this: it verifies routes, paths, counts and links, not the contents of a class. Found by reading the merge rather than by the gate, which is the honest limit of what the drift checker covers."
         }
     ]
 }
