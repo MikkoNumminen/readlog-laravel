@@ -89,7 +89,7 @@ Then `php artisan serve` for the app on <http://localhost:8000>, or
 Every change in this repository takes the same eight steps. If you are unsure what
 to do next, you are somewhere in this list.
 
-1. **Search `DECISIONS.md` first.** 138 numbered entries with a topic index at the
+1. **Search `DECISIONS.md` first.** 139 numbered entries with a topic index at the
    top. If a decision covers the behaviour you are about to change, you are
    changing a decision, not fixing a bug.
 2. **Branch.** Never commit to `main`.

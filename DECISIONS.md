@@ -10,7 +10,7 @@ read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 
 ## Finding a decision
 
-138 entries is past the size where reading down the file works. Look up the topic,
+139 entries is past the size where reading down the file works. Look up the topic,
 then search for its numbers.
 
 | Topic | Decisions |
@@ -298,4 +298,5 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 136 | The `docs-check` test reads the command's stock-key list instead of copying it, and the tests do not mutate the repository | The copied list was the concrete drift the review named: remove a name from the const and the test keeps skipping a key the command now demands. Exposing the const removes that. The first attempt at the wider fix had the tests break a real file and restore it in a `finally`, which reads well and is wrong here: two suites running at once is a property this repository claims and tests for, and a mutation is visible to the other run. It corrupted `config/services.php` and truncated `STATUS.md` to two lines on the first concurrent execution. Testing that the checks fire needs the command to accept a fixture root, which it does not; until then each check was verified by hand, breaking and restoring one at a time. Recorded in TODO.md. |
 | 137 | The stale-database sweep tolerates the file vanishing under it | `File::glob()` then `File::lastModified()` is a time-of-check gap, and with three suites running the other process's `finally` closed it first: `filemtime(): stat failed`. The file being gone is the outcome the sweep wanted, so the stat is wrapped and a failure means someone else got there. Found by running the suite three times at once, which is the check that also found decision 136's mistake. |
 | 138 | The cleanup test asserts on this process's own file, not on the directory | Three forms were tried. The old fixed path passed with the cleanup deleted. An empty-directory assertion failed on a file a killed run had left. A before-and-after difference failed on another concurrent suite's snapshot still in flight. Globbing `snapshot-<own pid>-*` is the only one that is both sensitive to the regression and blind to every other process. |
+| 139 | `ARCHITECTURE.md` describes `X-ReadLog-App` alongside the security headers, and says it is not one | PR 23 added the header to `SecurityHeaders` while PR 24 was open, so the merge of the two left the middleware setting a header the architecture document did not mention. `docs-check` cannot catch this: it verifies routes, paths, counts and links, not the contents of a class. Found by reading the merge rather than by the gate, which is the honest limit of what the drift checker covers. |
 

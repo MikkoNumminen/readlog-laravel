@@ -49,7 +49,11 @@ Three of the four things that happen to every request are not visible in
    - `SecurityHeaders` sets `X-Content-Type-Options`, `Referrer-Policy`,
      `X-Frame-Options` and a strict Content-Security-Policy. The policy is
      `script-src 'self'`, which is why `public/js/site.js` exists at all and why no
-     template may carry an inline script tag or an `onclick` attribute.
+     template may carry an inline script tag or an `onclick` attribute. It also
+     sets `X-ReadLog-App`, which is not a security header: it marks a response as
+     this app's, so the portal in front of it can tell one of our 404s from the
+     404 the project sharing that funnel port answers with when our mount is
+     absent. nginx sets the same header on the responses it generates itself.
    - `PortalPrefix` makes generated URLs survive being served under a path on
      another host. The portfolio site serves this app at
      `mikkonumminen.dev/readlog-laravel`; the mount strips its own prefix, so the
