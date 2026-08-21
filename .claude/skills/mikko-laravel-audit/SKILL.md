@@ -20,7 +20,13 @@ This skill is the **Laravel-specific reviewer** — the third lens, not a replac
 
 **Before doing anything else, verify the target looks like Laravel.** If it doesn't, abort cleanly with a one-line message and a pointer to a more appropriate skill.
 
-Procedure (single main-thread pass, ~2K tokens):
+Procedure: **run the bundled script** — it performs this pre-flight AND Phase 1.5's candidate gathering in one deterministic pass (one Bash call, ~zero judgement tokens):
+
+```
+python .claude/skills/mikko-laravel-audit/laravel-audit.py [--source PATH] [--json]
+```
+
+Exit 0 = proceed (candidate map follows on stdout); exit 2 = pre-flight bail, nothing else runs; exit 3 = a seed grep ERRORED (the healthy checks' candidates still print — investigate the errored check before trusting the run). If python is unavailable, fall back to the manual steps below; they and the script's decision matrix are the same:
 
 1. **`Glob` for `composer.json` + `artisan`** at the root. Read `composer.json`'s `require` for `laravel/framework` and the PHP constraint.
 2. **`Glob` for hand-written PHP** under `app/` (this is the Laravel convention; `vendor/` is never counted) and **Blade templates** under `resources/views/`.
@@ -64,11 +70,11 @@ If the pre-flight bails, no audit runs and no report is written.
 
 ## Token economy — deterministic before dispatch
 
-Everything that `git grep` and `Glob` can decide happens before a single subagent token is spent:
+Everything that `git grep` and `Glob` can decide happens before a single subagent token is spent — and it ships as a **bundled script** (`laravel-audit.py`, stdlib only), because a deterministic procedure the model re-composes by hand each run is neither deterministic nor cheap (the mikko-skills-quality thesis, and this skill's own first run proved it by mis-quoting its own greps):
 
-1. **Pre-flight** — pure `Glob`, ~2K.
+1. **Pre-flight + Phase 1.5 in one call** — `python .claude/skills/mikko-laravel-audit/laravel-audit.py` runs the fit check and every seed grep, printing the candidate map; the model reads one summary instead of composing ~20 grep invocations.
 2. **Phase 1** — the repo's own toolchain (`pint --test`, `phpstan`, `composer audit`) runs off-context; the model reads only the summary.
-3. **Phase 1.5 — candidate gathering** — a deterministic grep pass collects `file:line` sites for every check's seed pattern. This map **gates** Phase 2: a check with zero candidates costs zero tokens, and a group with zero candidates is **not dispatched at all**.
+3. **The candidate map gates Phase 2**: a check with zero candidates costs zero tokens, and a group with zero candidates is **not dispatched at all**.
 4. **Phase 2** — subagents *only judge the candidate list they're handed*: ±10 lines of context per candidate, calibration rules applied, never scanning for discovery.
 
 Cost scales with the number of *suspected* sites, not with codebase size.
@@ -301,6 +307,10 @@ Run from the repo root; capture output off-context; skip cleanly with a one-line
 
 ### Phase 1.5 — candidate gathering (deterministic, no AI tokens)
 
+**Normally already done**: the bundled `laravel-audit.py` executed every seed during Phase 0 and printed the map (per-check counts, zero-candidate list, grouped `file:line` sites, and an explicit ERROR line for any grep that failed rather than a silent zero). The script invokes git grep as an argument vector with `-e` and `--`, so dash-leading and quote-bearing patterns are structurally safe. **The script's seed table is the executable source of truth; the table below documents it and is the manual fallback** — change them together (the freshness check pins both).
+
+Manual fallback, only when python is unavailable:
+
 `git grep -nE -e "<pattern>" -- <paths>` over tracked files (which already excludes `vendor/` and `storage/` via .gitignore), one pass per seed pattern, scoped to the paths shown. **The `-e` is mandatory, not style**: five seeds begin with `->`, and without `-e` git grep parses them as options and yields a silent zero — the first run shipped exactly this bug and lost six checks to it until an impossible zero (on `$request->query(`, which exists in any Laravel controller) exposed it. Double-quote patterns for the shell; the C4 seed uses a `.` wildcard precisely so no seed has to embed a quote. Collect `{check, file:line, matched text}`, build the map grouped A–E, record per-check counts, and **gate dispatch**: a group with zero candidates is not dispatched.
 
 | Check | Seed (`git grep -nE`) | Scope | Judge narrows on |
@@ -417,7 +427,8 @@ is what makes a zero auditable; without it a clean run is just an assertion.}
 
 ## Failure modes
 
-- **A zero from a tool is a claim to verify, not a fact.** The first run's candidate pass silently zeroed six checks: five seed patterns begin with `->` and git grep parsed them as command options. The tell was a zero on a pattern that could not be zero. Phase 1.5 now mandates `-e`, and any surprising zero-candidate check must be re-verified against a known call site before its group is skipped.
+- **A zero from a tool is a claim to verify, not a fact.** The first run's candidate pass silently zeroed six checks: five seed patterns begin with `->` and git grep parsed them as command options. The tell was a zero on a pattern that could not be zero. The bundled script closes the bug class (argument-vector invocation, per-check ERROR lines instead of silent zeros), and the manual fallback mandates `-e`; a surprising zero-candidate check still gets re-verified against a known call site before its group is skipped.
+- **Two copies of the seed table can drift.** The script's `SEEDS` dict is executable truth; SKILL.md's table is documentation and fallback. An edit to one without the other makes the fallback and the normal path audit different things. Change them together; the freshness check asserts both files exist and both name the shared marker seeds.
 - **`git grep` misses untracked new files.** Files added but never `git add`ed escape the candidate pass; `git status` in the pre-flight notes any untracked PHP so the reader knows.
 - **The Blade N+1 seed sees echoed chains only.** `->[a-z_]+->` in `resources/views/` catches a relation chain echoed in a template; a chain assembled in a PHP variable before the loop, or a lazy load reached through a candidate-free call path, still escapes. Group B's judgment of the `->get()` sites covers most of the rest.
 - **Heuristic matching.** Ownership scoping (D3) and singleton statefulness (A2) need the auditor to connect a call site to a class definition — expect occasional false positives; the counter-example column tells the reader when a hit is fine.
@@ -465,4 +476,21 @@ kind = "file_contains"
 path = "SKILL.md"
 root = "skill_dir"
 pattern = "reviewed fix PRs"
+
+[[check]]
+kind = "path_exists"
+path = "laravel-audit.py"
+root = "skill_dir"
+
+[[check]]
+kind = "file_contains"
+path = "laravel-audit.py"
+root = "skill_dir"
+pattern = "B1_blade"
+
+[[check]]
+kind = "file_contains"
+path = "SKILL.md"
+root = "skill_dir"
+pattern = "B1 \(Blade\)"
 ```
