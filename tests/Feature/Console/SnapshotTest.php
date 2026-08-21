@@ -191,7 +191,34 @@ it('leaves no temporary database behind', function () {
 
     $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
 
-    expect(File::exists(storage_path('app/snapshot.sqlite')))->toBeFalse();
+    // This process's own file, by the prefix the command builds from getmypid()
+    // (decision 121). Asserting on the old fixed path storage/app/snapshot.sqlite
+    // would pass even with the cleanup removed; asserting the whole directory is
+    // empty would fail on a file a killed run left behind, or on another suite's
+    // snapshot still in flight beside this one.
+    expect(File::glob(storage_path('app/snapshot-'.getmypid().'-*.sqlite')))->toBeEmpty();
+});
+
+it('sweeps a throwaway database an earlier run left behind, but not a live one', function () {
+    // The per-process name means a killed run leaks a file nothing would reclaim.
+    // Anything older than an hour belongs to no running crawl.
+    fakeCovers();
+    // Named for this process, like the real thing: fixed names collide when two
+    // suites run at once, and one run's sweep then deletes the other's fixture
+    // between the glob and the stat.
+    $tag = getmypid().'-'.bin2hex(random_bytes(4));
+    $stale = storage_path('app/snapshot-stale'.$tag.'.sqlite');
+    $fresh = storage_path('app/snapshot-fresh'.$tag.'.sqlite');
+    File::put($stale, 'x');
+    File::put($fresh, 'x');
+    touch($stale, time() - 7200);
+
+    $this->artisan('readlog:snapshot', ['--out' => snapshotDir()])->assertExitCode(0);
+
+    expect(File::exists($stale))->toBeFalse()
+        ->and(File::exists($fresh))->toBeTrue();
+
+    File::delete($fresh);
 });
 
 it('produces byte-identical output on two runs', function () {

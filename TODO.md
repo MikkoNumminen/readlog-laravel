@@ -140,3 +140,16 @@ asserting the answer stays grounded and the citation allow-list still holds. The
 second is worth doing even before the first, because it turns an argument about
 whether the prompt is safe into a test that either passes or does not. Recorded in
 decision 117.
+
+**A fixture root for `readlog:docs-check`.** Every check in the command resolves
+against `base_path()`, so the only way to prove a check actually fires is to break
+a real file in the working tree. That is not safe here: two suites running at once
+is a property this repository claims, tests for and documents, and a mutation is
+visible to the other run. An attempt at it corrupted `config/services.php` and
+truncated `STATUS.md` on the first concurrent execution (decision 136). Threading
+an optional root through the command, defaulting to `base_path()`, would let the
+tests point it at a temporary tree and assert each failure message without touching
+anything shared. The route, command and count checks read global application state
+and would stay as they are. Until then the checks are verified by hand, one at a
+time, which is how every one of them was confirmed to work.
+

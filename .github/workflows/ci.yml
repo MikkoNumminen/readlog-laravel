@@ -47,34 +47,23 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      - name: The composite gate
-        # `composer verify` is the command AGENTS.md tells every contributor and
-        # every agent is the definition of done, so CI runs that command rather
-        # than an open-coded copy of its four steps. If the two could drift, the
-        # instruction would eventually be wrong.
-        run: composer verify
-
-      - name: Check formatting
-        run: vendor/bin/pint --test
-
-      - name: Static analysis
-        # PHPStan via Larastan, level 6. The nearest thing PHP has to the
-        # WarningsAsErrors=nullable build the .NET version runs on.
-        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
-
       - name: Run migrations against a clean database
         run: |
           touch database/database.sqlite
           php artisan migrate --force --seed
 
-      - name: Run the test suite
-        run: vendor/bin/pest --log-junit /tmp/junit.xml
+      - name: The gate
+        # `composer verify` is what AGENTS.md tells every contributor and every
+        # agent is the definition of done, so CI runs that command rather than an
+        # open-coded copy of its four steps (pint, phpstan level 6, pest,
+        # readlog:docs-check). If the two could drift, the instruction would
+        # eventually be wrong.
+        run: composer verify
 
-      - name: Documentation matches the repository
-        # readlog:docs-check verifies the claims the docs make: every relative link
-        # resolves, every path and route named in prose exists, docs/machine/*.json
-        # is not stale, and every env key config/services.php reads is documented.
-        run: php artisan readlog:docs-check
+      - name: Run the suite again for its JUnit output
+        # Only for the count comparison below, which needs the XML. Everything
+        # this asserts about pass or fail was already decided by the gate above.
+        run: vendor/bin/pest --log-junit /tmp/junit.xml
 
       - name: The documented test counts are the real ones
         # docs-check deliberately does not run the suite: a suite that counts itself
@@ -151,7 +140,10 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo_pgsql, pgsql, mbstring, fileinfo, curl, dom, xml, zip
+          # pdo_sqlite is here even though this job runs on Postgres: composer.json
+          # requires it (SQLite is the app's default connection), so composer install
+          # would refuse without it.
+          extensions: pdo_pgsql, pgsql, pdo_sqlite, mbstring, fileinfo, curl, dom, xml, zip
           coverage: none
 
       - name: Cache Composer packages

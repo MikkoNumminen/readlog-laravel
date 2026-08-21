@@ -29,7 +29,7 @@ Open Library plus Google Books lookup with its merge logic. All four are done.
 Authentication was not in scope and is not implemented; see below.
 
 ```
-344 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
+345 passing tests, 3 skipped (live API), on SQLite and on Postgres 16; PHPStan level 6
 ```
 
 ## What each pull request contains
@@ -337,8 +337,8 @@ Everything below was run on the final state of the branch:
 ```
 php artisan migrate:fresh --seed        # clean database, 12 books, 14 entries
 composer verify                         # pint, phpstan level 6, pest, docs-check: green
-vendor/bin/pest                         # 344 passed, 3 skipped, 1203 assertions (SQLite)
-DB_CONNECTION=pgsql ... vendor/bin/pest # 344 passed, 3 skipped (Postgres 16)
+vendor/bin/pest                         # 345 passed, 3 skipped, 1206 assertions (SQLite)
+DB_CONNECTION=pgsql ... vendor/bin/pest # 345 passed, 3 skipped (Postgres 16)
 vendor/bin/pint --test                  # passed
 BOOK_SEARCH_LIVE_TESTS=true \
   vendor/bin/pest --filter=LiveProvider # 1 passed, 2 skipped (no Google key)
@@ -349,7 +349,7 @@ docker compose exec app php artisan readlog:smoke --url=http://web
                                         # 6 PASS, 1 WARN (no Google key)
 ```
 
-As of PR 24 the same commands give 344 passed, 3 skipped, on both databases, and
+As of PR 24 the same commands give 345 passed, 3 skipped, on both databases, and
 `composer analyse` (PHPStan level 6) is clean; CI runs all of it on every push.
 
 Plus a manual pass over every route with `php artisan serve` and again through

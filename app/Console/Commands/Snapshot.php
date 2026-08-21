@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Symfony\Component\Console\Output\NullOutput;
+use Throwable;
 
 /**
  * Writes a static, browsable snapshot of the app to a directory.
@@ -119,6 +120,8 @@ class Snapshot extends Command
         // prepareDatabase() throws before it gets there.
         $this->databaseFile = storage_path('app/snapshot-'.getmypid().'-'.bin2hex(random_bytes(4)).'.sqlite');
 
+        $this->sweepStaleDatabases();
+
         // Whatever database, cache and session the process was using are put back
         // when the crawl is done. This runs in-process, so leaving the default
         // connection pointed at the throwaway database would surprise anything that
@@ -159,6 +162,36 @@ class Snapshot extends Command
         $this->components->info("Snapshot written to {$this->out}, links under {$this->base}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Removes throwaway databases an earlier run never got to delete.
+     *
+     * The per-process name (decision 121) cost the fixed path's one virtue: it was
+     * truncated on every run, so a file left by a crash was reclaimed by the next
+     * one. A kill, a fatal outside the try, or a cancelled CI job now leaves a few
+     * hundred KB in storage/app/ that nothing would ever remove, and
+     * storage/app/.gitignore keeps it out of `git status`.
+     *
+     * An hour is well past the longest a crawl takes and well short of anything a
+     * concurrent run needs, so a file older than that belongs to nobody.
+     */
+    private function sweepStaleDatabases(): void
+    {
+        $cutoff = time() - 3600;
+
+        foreach (File::glob(storage_path('app/snapshot-*.sqlite')) ?: [] as $stale) {
+            try {
+                // Another process can delete this between the glob and the stat,
+                // either its own finally or its own sweep. Both mean the file is
+                // already gone, which is the outcome this method wanted.
+                if (File::lastModified($stale) < $cutoff) {
+                    File::delete($stale);
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
     }
 
     /**
@@ -388,7 +421,7 @@ class Snapshot extends Command
             File::ensureDirectoryExists(dirname($target));
             File::put($target, $response->body());
             $this->covers[$url] = $relative;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Left pointing at the provider. Under a strict img-src the browser will
             // show nothing rather than the picture, which is the honest outcome of
             // a failed download and is reported in the summary.

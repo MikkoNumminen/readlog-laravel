@@ -51,10 +51,20 @@ class DocsCheck extends Command
      * use. Documenting them in .env.example would bury the handful that matter.
      * Delete a name from here the day the app actually starts using it.
      */
-    private const STOCK_SERVICE_KEYS = [
+    public const STOCK_SERVICE_KEYS = [
+        // config/services.php: mail and notification integrations.
         'POSTMARK_API_KEY', 'POSTMARK_MESSAGE_STREAM_ID', 'RESEND_API_KEY',
         'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION',
         'SLACK_BOT_USER_OAUTH_TOKEN', 'SLACK_BOT_USER_DEFAULT_CHANNEL',
+        // config/database.php: the MySQL, MariaDB, SQL Server and Redis
+        // connections Laravel ships. This app supports sqlite and pgsql only, and
+        // every key those two read is documented in .env.example.
+        'DB_SOCKET', 'DB_COLLATION', 'MYSQL_ATTR_SSL_CA', 'DB_ENCRYPT',
+        'DB_TRUST_SERVER_CERTIFICATE', 'REDIS_CLIENT', 'REDIS_CLUSTER',
+        'REDIS_URL', 'REDIS_HOST', 'REDIS_USERNAME', 'REDIS_PASSWORD',
+        'REDIS_PORT', 'REDIS_DB', 'REDIS_CACHE_DB', 'REDIS_PREFIX',
+        'REDIS_PERSISTENT', 'REDIS_MAX_RETRIES', 'REDIS_BACKOFF_ALGORITHM',
+        'REDIS_BACKOFF_BASE', 'REDIS_BACKOFF_CAP',
     ];
 
     /** @var list<string> */
@@ -62,6 +72,20 @@ class DocsCheck extends Command
 
     /** @var list<string> */
     private array $notes = [];
+
+    /**
+     * Markdown contents and heading anchors, read once.
+     *
+     * Five checks walk the same files, and checkLinkAnchors used to re-parse a
+     * target for every fragment link pointing at it, so a document with twenty
+     * such links was read from disk twenty times.
+     *
+     * @var array<string, string>
+     */
+    private array $contents = [];
+
+    /** @var array<string, list<string>> */
+    private array $anchors = [];
 
     public function handle(): int
     {
@@ -117,10 +141,13 @@ class DocsCheck extends Command
     private function checkMarkdownLinks(): void
     {
         foreach ($this->markdownFiles() as $file) {
-            $contents = (string) file_get_contents($file);
+            $contents = $this->contentsOf($file);
             $directory = dirname($file);
 
-            preg_match_all('/\]\(([^)\s#]+)(?:#[^)\s]*)?\)/', $contents, $matches);
+            // The optional trailing group is a link title, as in
+            // [Recipes](docs/RECIPES.md "the nine walkthroughs"). Without it the
+            // whole link failed to match and its target was never resolved at all.
+            preg_match_all('/\]\(([^)\s#]+)(?:#[^)\s"]*)?(?:\s+"[^"]*")?\)/', $contents, $matches);
 
             foreach ($matches[1] as $target) {
                 if (Str::startsWith($target, ['http://', 'https://', 'mailto:'])) {
@@ -128,6 +155,18 @@ class DocsCheck extends Command
                 }
 
                 $resolved = realpath($directory.'/'.$target);
+
+                // realpath() succeeds on a directory, which renders as a 404 on
+                // github.com, so a resolvable directory is still a broken link.
+                if ($resolved !== false && is_dir($resolved) && ! Str::endsWith($target, '/')) {
+                    $this->failures[] = sprintf(
+                        '%s links to "%s", which is a directory, not a file.',
+                        $this->relative($file),
+                        $target,
+                    );
+
+                    continue;
+                }
 
                 if ($resolved === false) {
                     $this->failures[] = sprintf(
@@ -148,7 +187,7 @@ class DocsCheck extends Command
     private function checkNoEmDashes(): void
     {
         foreach ($this->markdownFiles() as $file) {
-            $count = substr_count((string) file_get_contents($file), "\u{2014}");
+            $count = substr_count($this->contentsOf($file), "\u{2014}");
 
             if ($count > 0) {
                 $this->failures[] = sprintf(
@@ -176,7 +215,7 @@ class DocsCheck extends Command
                 continue;
             }
 
-            $contents = (string) file_get_contents($file);
+            $contents = $this->contentsOf($file);
 
             preg_match_all('/`([A-Za-z0-9_.\-\/]+\.(?:php|json|yaml|yml|sh|neon|xml|css|js|md|blade\.php))`/', $contents, $matches);
 
@@ -289,6 +328,13 @@ class DocsCheck extends Command
     private function checkEntryPoints(): void
     {
         $map = $this->readJson('repo-map.json');
+
+        if ($map === null) {
+            // checkRepoMap already reported the file as missing. Saying it twice,
+            // the second time as "names no entry points", points the reader at a
+            // list rather than at the absent file.
+            return;
+        }
 
         /** @var array<string, mixed> $entryPoints */
         $entryPoints = is_array($map['entryPoints'] ?? null) ? $map['entryPoints'] : [];
@@ -406,11 +452,30 @@ class DocsCheck extends Command
 
         $contents = (string) file_get_contents($prose);
 
+        $inJson = [];
+
         foreach ($invariants as $invariant) {
             $id = $invariant['id'] ?? null;
 
-            if (is_string($id) && ! preg_match('/\|\s*'.preg_quote($id, '/').'\s*\|/', $contents)) {
+            if (! is_string($id)) {
+                continue;
+            }
+
+            $inJson[] = $id;
+
+            if (! preg_match('/\|\s*'.preg_quote($id, '/').'\s*\|/', $contents)) {
                 $this->failures[] = sprintf('Invariant %s is in the JSON but not in docs/INVARIANTS.md.', $id);
+            }
+        }
+
+        // And the direction a person actually edits: a row added to the prose and
+        // never mirrored into the hand-written JSON. Checking only the other way
+        // left the likely drift uncovered.
+        preg_match_all('/^\|\s*([A-Z]\d+)\s*\|/m', $contents, $proseIds);
+
+        foreach (array_unique($proseIds[1]) as $id) {
+            if (! in_array($id, $inJson, true)) {
+                $this->failures[] = sprintf('Invariant %s is in docs/INVARIANTS.md but not in the JSON.', $id);
             }
         }
     }
@@ -433,14 +498,19 @@ class DocsCheck extends Command
 
         $documented = (string) file_get_contents($example);
 
-        foreach (['config/services.php', 'config/trustedproxy.php'] as $config) {
+        // config/database.php is stock Laravel except for DB_SSLMODE, which this
+        // app added, so it belongs in the scan. Anything else stock in there is
+        // already documented or covered by the stock-key list.
+        foreach (['config/services.php', 'config/trustedproxy.php', 'config/database.php'] as $config) {
             $path = base_path($config);
 
             if (! File::exists($path)) {
                 continue;
             }
 
-            preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", (string) file_get_contents($path), $matches);
+            // Either quote style. Matching only single quotes meant env("FOO")
+            // anywhere was silently exempt from the whole check.
+            preg_match_all('/env\(\s*[\'"]([A-Z0-9_]+)[\'"]/', (string) file_get_contents($path), $matches);
 
             foreach (array_unique($matches[1]) as $variable) {
                 if (in_array($variable, self::STOCK_SERVICE_KEYS, true)) {
@@ -724,7 +794,13 @@ class DocsCheck extends Command
             'nineteen' => 19, 'twenty' => 20,
         ];
 
-        $n = '(\d+|'.implode('|', array_keys($words)).')';
+        // \b on both sides: without it "fifty-nine" matches the `nine` alternative
+        // and reports a false failure against 59. Longest-first so "nineteen" is
+        // preferred over "nine".
+        $longestFirst = array_keys($words);
+        usort($longestFirst, fn (string $a, string $b) => strlen($b) <=> strlen($a));
+
+        $n = '(?<![\w-])(\d+|'.implode('|', $longestFirst).')(?![\w-])';
 
         // Each pattern must name what it counts. "20 entries" on its own is the
         // public feed's cap and "14 entries" is the seeded library, neither of
@@ -742,7 +818,7 @@ class DocsCheck extends Command
         ];
 
         foreach ($this->markdownFiles() as $file) {
-            $contents = (string) file_get_contents($file);
+            $contents = $this->contentsOf($file);
 
             foreach ($claims as [$pattern, $actual, $label]) {
                 if ($actual === 0) {
@@ -779,7 +855,7 @@ class DocsCheck extends Command
     private function checkLinkAnchors(): void
     {
         foreach ($this->markdownFiles() as $file) {
-            $contents = (string) file_get_contents($file);
+            $contents = $this->contentsOf($file);
             $directory = dirname($file);
 
             preg_match_all('/\]\(([^)\s#]*)#([^)\s]+)\)/', $contents, $matches, PREG_SET_ORDER);
@@ -814,25 +890,42 @@ class DocsCheck extends Command
      */
     private function anchorsIn(string $file): array
     {
-        preg_match_all('/^#{1,6}\s+(.+?)\s*$/m', (string) file_get_contents($file), $headings);
+        if (isset($this->anchors[$file])) {
+            return $this->anchors[$file];
+        }
 
-        return array_map(function (string $heading): string {
+        preg_match_all('/^#{1,6}\s+(.+?)\s*$/m', $this->contentsOf($file), $headings);
+
+        $anchors = [];
+        $seen = [];
+
+        foreach ($headings[1] as $heading) {
             $slug = strtolower(trim($heading));
-            $slug = (string) preg_replace('/`|\*|_|\[|\]|\(|\)/', '', $slug);
-            $slug = (string) preg_replace('/[^a-z0-9\s-]/', '', $slug);
+            // Markdown emphasis and link syntax is dropped, but the text inside a
+            // link is kept, the way GitHub keeps it.
+            $slug = (string) preg_replace('/`|\*|\[|\]|\((?:[^)]*)\)/', '', $slug);
+            // Underscores and hyphens survive; everything else that is not a word
+            // character or a space goes. GitHub keeps underscores, so stripping
+            // them here reported correct links to headings like "demo_user" broken.
+            $slug = (string) preg_replace('/[^\p{L}\p{N}\s_-]/u', '', $slug);
+            $slug = trim((string) preg_replace('/\s+/', '-', trim($slug)), '-');
 
-            return trim((string) preg_replace('/\s+/', '-', $slug), '-');
-        }, $headings[1]);
+            // GitHub disambiguates repeated headings with -1, -2, and so on.
+            $count = $seen[$slug] ?? 0;
+            $seen[$slug] = $count + 1;
+            $anchors[] = $count === 0 ? $slug : $slug.'-'.$count;
+        }
+
+        return $this->anchors[$file] = $anchors;
     }
 
     /** @return list<string> */
     private function markdownFiles(): array
     {
-        $files = array_map(
-            fn (string $name) => base_path($name),
-            ['README.md', 'AGENTS.md', 'CLAUDE.md', 'ARCHITECTURE.md', 'CONTRIBUTING.md',
-                'DECISIONS.md', 'DEMO.md', 'MIGRATION.md', 'STATUS.md', 'TODO.md'],
-        );
+        // Globbed, not listed. A hardcoded list is a third definition of "the
+        // documentation" alongside repo-map.json's entryPoints and the test's own
+        // glob, and a new root .md file would silently escape every check here.
+        $files = File::glob(base_path('*.md')) ?: [];
 
         $docs = base_path('docs');
 
@@ -845,6 +938,12 @@ class DocsCheck extends Command
         }
 
         return array_values(array_filter($files, File::exists(...)));
+    }
+
+    /** The contents of a markdown file, read at most once per run. */
+    private function contentsOf(string $file): string
+    {
+        return $this->contents[$file] ??= (string) file_get_contents($file);
     }
 
     /**

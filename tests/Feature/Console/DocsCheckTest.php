@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\DocsCheck;
+
 /*
 | readlog:docs-check. These run against the real repository rather than a fixture,
 | which is the point: the command's job is to be true about this checkout, and a
@@ -79,9 +81,11 @@ it('uses no em dashes in any document', function () {
 
 it('documents every environment variable its own configuration reads', function () {
     $documented = (string) file_get_contents(base_path('.env.example'));
-    $stock = ['POSTMARK_API_KEY', 'POSTMARK_MESSAGE_STREAM_ID', 'RESEND_API_KEY',
-        'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION',
-        'SLACK_BOT_USER_OAUTH_TOKEN', 'SLACK_BOT_USER_DEFAULT_CHANNEL'];
+
+    // The command's own list, not a copy of it. A copy drifts the day a name is
+    // removed from the const, and then the test and the command disagree while
+    // both look green.
+    $stock = DocsCheck::STOCK_SERVICE_KEYS;
 
     preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", (string) file_get_contents(config_path('services.php')), $matches);
 
