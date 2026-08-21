@@ -139,7 +139,7 @@ Self-review found the scripts committed without their executable bit (Git on
 Windows does not record it), a stale `.tunnel-url` that could have been copied
 into the image, and three tests that were wrong when first written.
 
-### Pull requests 8 to 24, in one table
+### Pull requests 8 to 26, in one table
 
 Later runs were smaller and are recorded here in one line each; every PR carries
 its own self-review.
@@ -161,7 +161,10 @@ its own self-review.
 | [20](https://github.com/MikkoNumminen/readlog-laravel/pull/20) | Review pass over PRs 16 to 19: thirteen findings fixed (parser false positives, nginx timeout, throttle, embedding race, control panel edge cases). |
 | [21](https://github.com/MikkoNumminen/readlog-laravel/pull/21) | Snapshot banner names the AI ask box as inactive too. |
 | [22](https://github.com/MikkoNumminen/readlog-laravel/pull/22) | The live app under mikkonumminen.dev/readlog-laravel: `PortalPrefix`, the funnel path mount, on means everything. |
+| [23](https://github.com/MikkoNumminen/readlog-laravel/pull/23) | Portal: the app names itself in every response (`X-ReadLog-App`, set by the middleware and by nginx alike), so the portal can tell this app's 404 from the co-tenant's and fall back to the snapshot only when readlog is truly off. |
 | [24](https://github.com/MikkoNumminen/readlog-laravel/pull/24) | Making the repository legible to a coding agent: ARCHITECTURE.md, AGENTS.md, CONTRIBUTING.md, invariants, recipes, glossary, `docs/machine/*.json`, and `readlog:docs-check` in `composer verify` and CI. |
+| [25](https://github.com/MikkoNumminen/readlog-laravel/pull/25) | ARCHITECTURE.md names the `X-ReadLog-App` header the PR 23 and 24 merge introduced, a drift `readlog:docs-check` cannot see. |
+| [26](https://github.com/MikkoNumminen/readlog-laravel/pull/26) | A project-local Laravel audit skill (the `mikko-*` suite is PHP-blind), its first run (121 candidates, zero findings), and its opt-in reviewed-fix-PR phase. |
 
 ## Hosting: what is automated and what is manual
 

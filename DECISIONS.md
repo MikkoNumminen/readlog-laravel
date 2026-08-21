@@ -10,7 +10,7 @@ read from a local checkout at `D:\koodaamista\Readlog-csharp`.
 
 ## Finding a decision
 
-139 entries is past the size where reading down the file works. Look up the topic,
+142 entries is past the size where reading down the file works. Look up the topic,
 then search for its numbers.
 
 | Topic | Decisions |
@@ -48,6 +48,7 @@ then search for its numbers.
 | Prompt injection, recorded not fixed | 117 |
 | Test determinism and the environment surface | 121, 122, 125, 129, 130, 131, 133, 137, 138 |
 | Measuring and checking the documentation itself | 123, 124, 126, 127, 128, 132, 134, 135, 136 |
+| The project-local Laravel audit skill | 140, 141, 142 |
 
 ## Setup
 
@@ -299,4 +300,12 @@ dashboard, and its decisions) was dropped before it reached a pull request.
 | 137 | The stale-database sweep tolerates the file vanishing under it | `File::glob()` then `File::lastModified()` is a time-of-check gap, and with three suites running the other process's `finally` closed it first: `filemtime(): stat failed`. The file being gone is the outcome the sweep wanted, so the stat is wrapped and a failure means someone else got there. Found by running the suite three times at once, which is the check that also found decision 136's mistake. |
 | 138 | The cleanup test asserts on this process's own file, not on the directory | Three forms were tried. The old fixed path passed with the cleanup deleted. An empty-directory assertion failed on a file a killed run had left. A before-and-after difference failed on another concurrent suite's snapshot still in flight. Globbing `snapshot-<own pid>-*` is the only one that is both sensitive to the regression and blind to every other process. |
 | 139 | `ARCHITECTURE.md` describes `X-ReadLog-App` alongside the security headers, and says it is not one | PR 23 added the header to `SecurityHeaders` while PR 24 was open, so the merge of the two left the middleware setting a header the architecture document did not mention. `docs-check` cannot catch this: it verifies routes, paths, counts and links, not the contents of a class. Found by reading the merge rather than by the gate, which is the honest limit of what the drift checker covers. |
+
+## Run 6: a Laravel-shaped audit for a Laravel codebase
+
+| # | Decision | Reasoning |
+| --- | --- | --- |
+| 140 | A project-local `mikko-laravel-audit` skill exists, because the installed `mikko-*` suite is blind to PHP | The suite's detector fingerprints package.json, tsconfig, pyproject, Cargo.toml, go.mod and csproj files and never opens composer.json, so it reported "language: unknown, security surface: low" for this repo; the only stack-specific audits installed are .NET and React, and both bail at their own pre-flights here. The skill mirrors the dotnet audit's proven shape: pre-flight fit check, deterministic grep candidates gating five parallel judges, every check pairing a smell with a legitimate counter-example. Two local adaptations: DECISIONS.md immunises documented oddities, and the report format must itself pass `readlog:docs-check`, since this repository audits its own documentation. |
+| 141 | The first audit run kept zero of 121 candidates, and the report says why a zero is credible here | Every candidate matched a documented counter-example, most of them this repo's own recorded past bugs; the judges cite the exact code they cleared rather than waving groups through, and four earlier review passes had already fixed precisely these shapes. The run also caught a bug in its own pre-pass: five `git grep` patterns beginning with `->` were parsed as command options, silently zeroing six checks (one seed serves both B1 and B2), caught because a zero on `$request->query(` was impossible. Recorded in the skill's failure modes: a zero from a tool is a claim to verify, not a fact. |
+| 142 | The skill gains an opt-in `--prs` phase: findings become area-named branches, each PR machine-reviewed, review findings fixed before handover | The read-only default stays, and a zero-finding run lands nothing. The phase exists because the audit loop in this repository has never actually ended at a defect list: every review pass so far (PRs 9, 12, 20, 24) ended in a reviewed PR whose review found more than the pass itself did, twice including bugs in that pass's own fixes. Naming that ending in the procedure makes it happen by rule rather than by memory. Merging stays human, always. |
 
