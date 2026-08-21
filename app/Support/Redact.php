@@ -9,6 +9,9 @@ namespace App\Support;
  * and the smoke check (printing one) had their own copy of the same regex; a
  * rule that exists to keep a key out of a log file must not be able to drift
  * between the two.
+ *
+ * .NET counterpart: none as a type. The source inlines the same regex at each
+ * call site, which is exactly the drift this class exists to prevent.
  */
 final class Redact
 {

@@ -38,6 +38,23 @@ The process is the point, so it is all here:
 - The [pull requests](https://github.com/MikkoNumminen/readlog-laravel/pulls) carry
   a self-review each, including the bugs found while reviewing.
 
+And because a repository like this is now read by coding agents as often as by
+people, the same ground is covered again in a form one can act on:
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** is how the system is put together, the
+  request lifecycle, and where a new piece of code belongs.
+- **[AGENTS.md](AGENTS.md)** is the contract: the commands, the golden path, and
+  the rules that will break a test if ignored. [CLAUDE.md](CLAUDE.md) points at it.
+- **[docs/INVARIANTS.md](docs/INVARIANTS.md)** is the 59 things that must stay true,
+  each naming the test that guards it.
+- **[docs/RECIPES.md](docs/RECIPES.md)** is the step-by-step for the changes this
+  repository actually receives, and [docs/GLOSSARY.md](docs/GLOSSARY.md) is what the
+  domain words mean here.
+- **[docs/machine/](docs/machine/)** is the same facts as JSON, so tooling does not
+  have to parse English, and `php artisan readlog:docs-check` fails the build when
+  any of it stops being true. [docs/AI-FIRST.md](docs/AI-FIRST.md) explains how that
+  readiness is scored.
+
 The original of both apps is
 [ReadLog](https://github.com/MikkoNumminen/ReadLog), a Next.js and Prisma
 application, so this is the second port of the same behaviour.
@@ -47,7 +64,7 @@ application, so this is the second port of the same behaviour.
 Feature-complete against readlog-dotnet's version 1 scope: books, reading entries,
 library search, and the multi-source lookup with its merge logic, plus the
 "ask your library" search over a local Ollama, which degrades to the title search
-when Ollama is absent. 326 passing tests plus 3 live-API tests that are skipped
+when Ollama is absent. 345 passing tests plus 3 live-API tests that are skipped
 by default, run against both SQLite and Postgres in CI, with PHPStan level 6. **There is no authentication**, deliberately, and the app
 ships a demo reader switcher in its place; see STATUS.md for that and for the
 other known gaps.
@@ -122,8 +139,10 @@ To put the running app on a temporary public URL, `scripts/tunnel-up.sh` (and
 
 ### With PHP on the host
 
-- PHP 8.3 or newer, with `pdo_sqlite`, `sqlite3`, `mbstring`, `curl`, `fileinfo`,
-  `dom`, `xml` and `zip`
+- PHP 8.4.1 or newer, with `pdo_sqlite`, `sqlite3`, `mbstring`, `curl`, `fileinfo`,
+  `dom` and `xml`. Those are declared in `composer.json`, so `composer install`
+  names the missing one rather than failing later. `zip` is wanted by Composer
+  itself and by the dev toolchain, but the app does not need it at runtime
 - [Composer](https://getcomposer.org/)
 
 ```bash
@@ -181,8 +200,16 @@ while can take half a minute while the models load (measured: 47 s cold, 0.5 to
 ## Running the tests
 
 ```bash
-vendor/bin/pest          # 222 tests, no network access
-vendor/bin/pint --test   # formatting
+composer verify          # the gate: formatting, PHPStan level 6, the suite, doc drift
+```
+
+Or one at a time:
+
+```bash
+vendor/bin/pest                 # 345 passed, 3 skipped, 1206 assertions, no network
+vendor/bin/pint --test          # formatting
+composer analyse                # PHPStan level 6
+php artisan readlog:docs-check  # the documentation against the repository
 ```
 
 CI runs the same suite against SQLite and against a stock `postgres:16` service

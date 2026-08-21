@@ -18,6 +18,9 @@ use Illuminate\Console\Command;
  * Writes embed as they happen when Ollama is up, and searches fill small gaps
  * as they go; this is for the two cases those do not cover: a database that
  * existed before Ollama did, and a change of embedding model.
+ *
+ * .NET counterpart: none. The AI search was added in this port, and
+ * readlog-dotnet has no console surface at all.
  */
 class EmbedEntries extends Command
 {

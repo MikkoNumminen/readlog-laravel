@@ -20,6 +20,9 @@ use Illuminate\Console\Command;
  * --warm sends one tiny embed and one tiny generate so both models are loaded
  * before the first real question. Measured: the first question on a cold GPU
  * took 47 s and the next 3 s; that difference is what this buys.
+ *
+ * .NET counterpart: none. The AI search was added in this port, and
+ * readlog-dotnet has no console surface at all.
  */
 class AskLibrary extends Command
 {

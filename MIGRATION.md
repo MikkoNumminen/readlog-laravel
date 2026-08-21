@@ -447,6 +447,27 @@ type per dependency. A feature the .NET version does not have was the easiest
 one to write, because the port had already decided how the codebase treats an
 optional external service.
 
+**The agent-facing documentation layer** (`ARCHITECTURE.md`, `AGENTS.md`,
+`CONTRIBUTING.md`, `docs/`, PR 24) has no counterpart either, and readlog-dotnet
+needs less of it for a reason worth recording. A C# reader gets from the compiler
+and the IDE much of what this layer has to write down: the dependency direction is
+visible in the project references, the request pipeline is a readable sequence in
+`Program.cs`, and `[Authorize]` on a page model states the access rule where a
+reader of that page will see it. Laravel spreads the same facts thinner. The `web`
+middleware group is applied by a keyword in `bootstrap/app.php` and appears in no
+route line; two middleware are appended globally and appear in neither; route
+model constraints, names and middleware sit in a file no page mentions. None of
+that is worse, but it is less discoverable by reading one file, which is exactly
+the gap `ARCHITECTURE.md` fills.
+
+The same asymmetry produced `readlog:docs-check`. The .NET side gets a compile
+error when a rename makes a document's code sample false; PHP gets nothing, and
+this repository's documentation had drifted accordingly, claiming three different
+test counts across two files. A command that fails the build on a dead link, an
+undocumented route, an undocumented environment variable or a stale generated file
+is the nearest thing PHP has to that compile error, and it belongs in the same
+`composer verify` gate as PHPStan for the same reason.
+
 ## How AI assistance was used, and where it was wrong
 
 The whole migration was done with an AI coding agent (Claude Code) driving, with

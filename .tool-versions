@@ -1,0 +1,6 @@
+# asdf / mise toolchain pin.
+#
+# composer.json requires ^8.4.1 and pins config.platform.php to 8.4.1, because
+# the locked Symfony 8 packages require 8.4.1 (see decision 122). CI and the
+# Dockerfile both run 8.4, so this matches all three.
+php 8.4.24

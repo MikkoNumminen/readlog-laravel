@@ -111,3 +111,45 @@ lives only in request validation. A SQLite trigger, or a raw `CREATE TABLE` in t
 migration, would restore it. The test
 `tests/Feature/Database/SchemaConstraintsTest.php` currently asserts the gap, so
 it is the test that should fail and be rewritten when this is done.
+
+**A test for the embedding race.** `EntryEmbedder::embedMany()` catches
+`UniqueConstraintViolationException` and treats a lost race as success, because the
+winner's row is as good as ours (decision 107). Nothing pins that. The one-shot
+query-listener technique that pins the catalogue-book race in `ReadLogServiceTest`
+does not reach the window here: the only query the embedder issues against
+`read_entry_embeddings` is an eager load with an `IN` list, so a row planted from
+the listener is found by `updateOrCreate`'s lookup and updated rather than
+colliding. Forcing it needs either a second real connection, or splitting the
+`updateOrCreate` into an explicit `firstOrNew` and `save()` so the lookup is a
+separate, hookable query. The second is small and would make the catch testable
+without changing behaviour.
+
+**A red-team fixture for the AI search.** The containment boundary holds where it
+matters: the model is shown only rows the database already selected for the acting
+reader, and any id it cites that it was not shown is dropped and could not have
+fetched a row anyway. There is a test for both. What is not bounded is the shape of
+the prompt itself: book titles and authors are reader-supplied text, and the entries
+block is delimited only by a header line and newlines, so a title containing a
+newline followed by text that mimics the trailing instruction block is structurally
+indistinguishable from the prompt's own framing. A successful injection cannot reach
+data outside the entries already shown and cannot write anything, but it can make
+the model emit arbitrary prose to the reader or cite the wrong subset. Two pieces of
+work: fence the entries block so data cannot be mistaken for instructions, and add
+`tests/Feature/Ai/LibraryAskInjectionTest.php` with adversarial titles as fixtures,
+asserting the answer stays grounded and the citation allow-list still holds. The
+second is worth doing even before the first, because it turns an argument about
+whether the prompt is safe into a test that either passes or does not. Recorded in
+decision 117.
+
+**A fixture root for `readlog:docs-check`.** Every check in the command resolves
+against `base_path()`, so the only way to prove a check actually fires is to break
+a real file in the working tree. That is not safe here: two suites running at once
+is a property this repository claims, tests for and documents, and a mutation is
+visible to the other run. An attempt at it corrupted `config/services.php` and
+truncated `STATUS.md` on the first concurrent execution (decision 136). Threading
+an optional root through the command, defaulting to `base_path()`, would let the
+tests point it at a temporary tree and assert each failure message without touching
+anything shared. The route, command and count checks read global application state
+and would stay as they are. Until then the checks are verified by hand, one at a
+time, which is how every one of them was confirmed to work.
+

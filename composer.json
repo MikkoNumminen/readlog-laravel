@@ -10,7 +10,14 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4.1",
+        "ext-curl": "*",
+        "ext-dom": "*",
+        "ext-fileinfo": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-xml": "*",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "symfony/html-sanitizer": "^8.1"
@@ -53,6 +60,15 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "verify": [
+            "@php vendor/bin/pint --test",
+            "@php vendor/bin/phpstan analyse --memory-limit=1G",
+            "@php vendor/bin/pest",
+            "@php artisan readlog:docs-check"
+        ],
+        "docs-check": [
+            "@php artisan readlog:docs-check"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
@@ -93,5 +109,19 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts-descriptions": {
+        "setup": "Install, create .env, generate a key, migrate and seed.",
+        "dev": "Serve the app on http://localhost:8000.",
+        "test": "Run the Pest suite with a cleared config cache.",
+        "verify": "The gate: formatting, PHPStan level 6, the suite, and documentation drift.",
+        "docs-check": "Check the documentation against the repository.",
+        "analyse": "PHPStan level 6 via Larastan.",
+        "snapshot": "Write the static snapshot to build/snapshot/."
+    },
+    "suggest": {
+        "ext-zip": "Only for the development toolchain; Composer prefers it over the unzip binary. The runtime image does not have it and does not need it.",
+        "ext-pdo_pgsql": "Required only to run against PostgreSQL instead of the default SQLite. Set DB_CONNECTION=pgsql; see .env.example.",
+        "ext-intl": "Not used by the app, but Laravel enables extra formatting when present."
+    }
 }
