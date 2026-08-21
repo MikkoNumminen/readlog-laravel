@@ -36,7 +36,7 @@ SEEDS = {
     "A3":       (r"\bsession\(|\brequest\(|\bauth\(|Session::|Auth::",    ["app/Services", "app/Support", "app/Models"]),
     "A4":       (r"Config::set|config\(\[",                               ["app"]),
     "B12":      (r"->get\(\)|::all\(\)",                                  ["app"]),
-    "B1_blade": (r"->[a-z_]+->",                                          ["resources/views"]),
+    "B1_blade": (r"->[a-zA-Z_]+->",                                       ["resources/views"]),
     "B3":       (r"->all\(\)|\$guarded|forceFill",                        ["app"]),
     "B4":       (r"DB::raw|whereRaw|selectRaw|orderByRaw|havingRaw|->statement\(", ["app", "database"]),
     "B5":       (r"->exists\(\)|firstOrCreate|updateOrCreate",            ["app"]),
@@ -82,12 +82,16 @@ def preflight(root: Path) -> tuple[dict, int]:
 
     status = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all"],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
     if status.returncode == 0:
+        # Only '??' lines: modified tracked files are still searched by git grep
+        # (it reads the worktree); untracked files are the one category the
+        # candidate pass cannot see, so that is the number worth reporting.
         facts["untracked_php"] = sum(
-            1 for line in status.stdout.splitlines() if line.strip().endswith(".php"))
+            1 for line in status.stdout.splitlines()
+            if line.startswith("??") and line.strip().endswith(".php"))
 
-    php_anywhere = facts["app_php"] or any(root.glob("*.php"))
+    php_anywhere = facts["app_php"] or any(root.glob("*.php")) or any(root.glob("*/*.php"))
     if facts["laravel"] and facts["app_php"] >= 10:
         facts["verdict"] = "proceed"
         return facts, 0
@@ -134,6 +138,10 @@ def gather(root: Path) -> tuple[dict, dict, dict]:
 
 
 def main() -> int:
+    # Matched lines can carry any text the codebase does; a cp1252 Windows
+    # console would crash print() on the first non-ASCII character.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--source", default=".", help="repo root to audit (default: cwd)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")

@@ -320,7 +320,7 @@ Manual fallback, only when python is unavailable:
 | A3 | `\bsession\(\|\brequest\(\|\bauth\(\|Session::\|Auth::` | `app/Services/ app/Support/ app/Models/` | not CurrentUser; not constructor-injected contracts |
 | A4 | `Config::set\|config\(\[` | `app/` | no save+restore in finally |
 | B1 | `->get\(\)\|::all\(\)` | `app/` | relation walked per-row downstream w/o with() |
-| B1 (Blade) | `->[a-z_]+->` | `resources/views/` | a relation chain echoed inside a loop |
+| B1 (Blade) | `->[a-zA-Z_]+->` | `resources/views/` | a relation chain echoed inside a loop |
 | B2 | `->get\(\)\|::all\(\)` | `app/` | growable table, no bound, no decision cover |
 | B3 | `->all\(\)\|guarded\|forceFill` | `app/` | request-fed, not validated()/DTO |
 | B4 | `DB::raw\|whereRaw\|selectRaw\|orderByRaw\|havingRaw\|statement\(` | `app/ database/` | variable interpolated vs `?` bindings |
@@ -430,7 +430,7 @@ is what makes a zero auditable; without it a clean run is just an assertion.}
 - **A zero from a tool is a claim to verify, not a fact.** The first run's candidate pass silently zeroed six checks: five seed patterns begin with `->` and git grep parsed them as command options. The tell was a zero on a pattern that could not be zero. The bundled script closes the bug class (argument-vector invocation, per-check ERROR lines instead of silent zeros), and the manual fallback mandates `-e`; a surprising zero-candidate check still gets re-verified against a known call site before its group is skipped.
 - **Two copies of the seed table can drift.** The script's `SEEDS` dict is executable truth; SKILL.md's table is documentation and fallback. An edit to one without the other makes the fallback and the normal path audit different things. Change them together; the freshness check asserts both files exist and both name the shared marker seeds.
 - **`git grep` misses untracked new files.** Files added but never `git add`ed escape the candidate pass; `git status` in the pre-flight notes any untracked PHP so the reader knows.
-- **The Blade N+1 seed sees echoed chains only.** `->[a-z_]+->` in `resources/views/` catches a relation chain echoed in a template; a chain assembled in a PHP variable before the loop, or a lazy load reached through a candidate-free call path, still escapes. Group B's judgment of the `->get()` sites covers most of the rest.
+- **The Blade N+1 seed sees echoed chains only.** `->[a-zA-Z_]+->` in `resources/views/` catches a relation chain echoed in a template; a chain assembled in a PHP variable before the loop, or a lazy load reached through a candidate-free call path, still escapes. Group B's judgment of the `->get()` sites covers most of the rest.
 - **Heuristic matching.** Ownership scoping (D3) and singleton statefulness (A2) need the auditor to connect a call site to a class definition — expect occasional false positives; the counter-example column tells the reader when a hit is fine.
 - **Octane/queue-worker lifetimes.** This skill assumes php-fpm's request-per-process model (what this repo runs). Long-lived worker hazards (static leaks, container bleed) are out of v1 scope.
 
