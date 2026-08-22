@@ -32,7 +32,11 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    // Fourteen days, and Laravel re-issues the cookie on each request, which is
+    // the sliding expiry ConfigureApplicationCookie sets in the .NET original
+    // (ExpireTimeSpan 14 days, SlidingExpiration true). Sign-in deliberately does
+    // not issue a remember cookie; this is the whole of how long a session lasts.
+    'lifetime' => (int) env('SESSION_LIFETIME', 20160),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

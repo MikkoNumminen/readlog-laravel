@@ -91,15 +91,26 @@ one, so links from its screenshots and notes still resolve. The generated form i
 | --- | --- | --- | --- | --- |
 | GET | `/` | `feed` | web | `FeedController@index` |
 | GET | `/book` | `book.show` | web | `BookController@show` |
-| POST | `/demo-user` | `demo-user.update` | web | `DemoUserController@update` |
-| GET | `/library` | `library.index` | web, demo.user, throttle:ask | `LibraryController@index` |
-| GET | `/library/{entry}/edit` | `entries.edit` | web, demo.user | `ReadEntryController@edit` |
-| PUT | `/library/{entry}` | `entries.update` | web, demo.user | `ReadEntryController@update` |
-| DELETE | `/library/{entry}` | `entries.destroy` | web, demo.user | `ReadEntryController@destroy` |
-| GET | `/log` | `log.create` | web, demo.user | `LogController@create` |
-| POST | `/log` | `log.store` | web, demo.user | `LogController@store` |
-| GET | `/account` | `account.show` | web, demo.user | `AccountController@show` |
+| GET | `/signin` | `signin` | web | `GoogleSignInController@show` |
+| GET | `/signin/google` | `signin.google` | web | `GoogleSignInController@redirect` |
+| GET | `/signin/google/callback` | `signin.google.callback` | web | `GoogleSignInController@callback` |
+| POST | `/signout` | `signout` | web | `GoogleSignInController@destroy` |
+| GET | `/library` | `library.index` | web, throttle:ask | `LibraryController@index` |
+| GET | `/library/{entry}/edit` | `entries.edit` | web, auth | `ReadEntryController@edit` |
+| PUT | `/library/{entry}` | `entries.update` | web, auth | `ReadEntryController@update` |
+| DELETE | `/library/{entry}` | `entries.destroy` | web, auth | `ReadEntryController@destroy` |
+| GET | `/log` | `log.create` | web, auth | `LogController@create` |
+| POST | `/log` | `log.store` | web, auth | `LogController@store` |
+| GET | `/account` | `account.show` | web, auth | `AccountController@show` |
 | GET | `/up` | none | web | framework health closure |
+
+Reading is open and writing is not, which is the one rule to keep in mind when
+adding a route. `library.index` is deliberately outside the `auth` group: the
+public URL is a portfolio link, and a login wall would waste it. A signed-out
+visitor sees the showcase reader's library, which `CurrentUser::showcase()`
+picks as the oldest account with `shares_publicly` set. Everything that writes
+sits behind `auth`, and an unauthenticated request to one of those is sent to
+`signin` by the redirect configured in `bootstrap/app.php`.
 
 Three details that catch people:
 

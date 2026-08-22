@@ -28,11 +28,33 @@ class LibraryController extends Controller
 
     public function index(Request $request): View
     {
-        $userId = $this->currentUser->id();
+        // Null when nobody has opted into being public and nobody is signed in,
+        // which is every migrated-but-unseeded install. This page is public, so
+        // that has to render an empty library rather than throw: CurrentUser::id()
+        // is for the write routes, which the auth middleware guarantees a reader
+        // for. Before this, /library answered 500 to every visitor on a fresh
+        // database.
+        $reader = $this->currentUser->get();
 
         // Anything other than "list" is the grid, matching the source's
         // `view == "list" ? "list" : "grid"`.
         $view = $request->query('view') === 'list' ? 'list' : 'grid';
+
+        if ($reader === null) {
+            return view('library', [
+                'entries' => collect(),
+                'view' => $view,
+                'query' => null,
+                'searched' => false,
+                'searchResults' => collect(),
+                'askEnabled' => false,
+                'ask' => null,
+                'askResult' => null,
+                'askFallback' => collect(),
+            ]);
+        }
+
+        $userId = $reader->id;
 
         $query = $request->query('q');
         $query = is_string($query) ? $query : null;

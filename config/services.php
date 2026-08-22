@@ -53,6 +53,18 @@ return [
         'base_url' => env('OPEN_LIBRARY_BASE_URL', 'https://openlibrary.org/'),
     ],
 
+    /*
+    | Google sign-in. Absent by default, and absence is a supported state: the
+    | sign-in page says so and the app runs read-only for everyone, which is what
+    | a fresh clone and the static snapshot both get. The .NET original registers
+    | its Google handler the same way, only when both halves are configured.
+    */
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID', ''),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET', ''),
+        'timeout' => (int) env('GOOGLE_OAUTH_TIMEOUT', 10),
+    ],
+
     'google_books' => [
         'api_key' => env('GOOGLE_BOOKS_API_KEY'),
         'base_url' => env('GOOGLE_BOOKS_BASE_URL', 'https://www.googleapis.com/books/v1/'),

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ReadEntry;
 use App\Models\User;
 
 /*
@@ -32,15 +33,20 @@ it('allows https images so book covers load', function () {
         ->toContain('img-src \'self\' https: data:');
 });
 
-it('binds the reader switcher without an inline event handler', function () {
+it('binds every control without an inline event handler', function () {
     // The strict script-src above is only worth having if nothing on the page needs
-    // 'unsafe-inline'. The switcher is the one control that would be tempted to.
+    // 'unsafe-inline'. The delete confirmation is the one control tempted to: it
+    // carries data-confirm and public/js/site.js binds the handler. The reader
+    // switcher used to be the other, and went with the arrival of Google sign-in.
     $user = User::factory()->create();
+    $entry = ReadEntry::factory()->for($user)->create();
 
-    $html = actingAsReader($user)->get('/library')->getContent();
+    $html = actingAsReader($user)->get("/library/{$entry->id}/edit")->getContent();
 
-    expect($html)->toContain('data-auto-submit')
-        ->and($html)->not->toContain('onchange=');
+    expect($html)->toContain('data-confirm')
+        ->and($html)->not->toContain('onchange=')
+        ->and($html)->not->toContain('onclick=')
+        ->and($html)->not->toContain('onsubmit=');
 });
 
 it('names the app in every response, so the portal can tell it from a stranger on the same funnel port', function () {

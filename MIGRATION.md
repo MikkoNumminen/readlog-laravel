@@ -106,7 +106,7 @@ shapes and the merge in the same cases.
 | `src/ReadLog.Web/Dtos/UpdateReadEntryRequest.cs` | `app/Http/Requests/UpdateReadEntryRequest.php` plus `app/Support/UpdateReadEntryData.php` |
 | `src/ReadLog.Web/Dtos/LibraryDtos.cs` | `app/Support/LibraryEntry.php`, `BookSummary.php`, `PublicRead.php`, `AccountStats.php` |
 | `src/ReadLog.Web/Validation/NotInFutureAttribute.cs` | the rule string `before_or_equal:today` |
-| `[Authorize]` | `app/Http/Middleware/RequireDemoUser.php` on a route group |
+| `[Authorize]` | Laravel's own `auth` middleware on a route group |
 | `src/ReadLog.Web/Auth/ClaimsPrincipalExtensions.cs` | `app/Services/CurrentUser.php` |
 | the `app.Use(...)` header block in `Program.cs` | `app/Http/Middleware/SecurityHeaders.php` |
 | `ForwardedHeadersOptions` in `Program.cs` (KnownProxies cleared) | `config/trustedproxy.php`, `TRUSTED_PROXIES` |
@@ -130,7 +130,7 @@ property the .NET service gets by taking `userId` as a parameter.
 | --- | --- |
 | `Pages/Shared/_Layout.cshtml` | `resources/views/layouts/app.blade.php` |
 | `Pages/Shared/_Stars.cshtml` | `resources/views/partials/stars.blade.php` |
-| `Pages/Shared/_LoginPartial.cshtml` | `resources/views/partials/demo-user.blade.php` |
+| `Pages/Shared/_LoginPartial.cshtml` | `resources/views/partials/account-menu.blade.php` |
 | `Pages/Index.cshtml` | `resources/views/feed.blade.php` |
 | `Pages/Library.cshtml` | `resources/views/library.blade.php` |
 | `Pages/Library/Edit.cshtml` | `resources/views/entries/edit.blade.php` |

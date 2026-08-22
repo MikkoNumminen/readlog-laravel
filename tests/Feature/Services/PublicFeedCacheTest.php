@@ -55,7 +55,7 @@ function aLoggedBook(int $userId, string $id, string $title, string $finishedAt)
 }
 
 it('survives a second read through a serialising cache store', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->sharesPublicly()->create();
     aLoggedBook($user->id, 'ol:1', 'Dune', '2024-01-01');
 
     $first = feedService()->getRecentPublicReads();  // populates the cache
@@ -68,7 +68,7 @@ it('survives a second read through a serialising cache store', function () {
 });
 
 it('keeps every field intact across the cache round trip', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->sharesPublicly()->create();
     aLoggedBook($user->id, 'ol:1', 'Dune', '2024-01-01');
 
     $fresh = feedService()->getRecentPublicReads()->first();
@@ -83,7 +83,7 @@ it('keeps every field intact across the cache round trip', function () {
 });
 
 it('stores no PHP objects in the cache at all', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->sharesPublicly()->create();
     aLoggedBook($user->id, 'ol:1', 'Dune', '2024-01-01');
 
     feedService()->getRecentPublicReads();

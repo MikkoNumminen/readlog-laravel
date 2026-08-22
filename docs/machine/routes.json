@@ -15,7 +15,7 @@
         "action": "App\\Http\\Controllers\\AccountController@show",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
         ]
     },
     {
@@ -28,22 +28,12 @@
         ]
     },
     {
-        "method": "POST",
-        "uri": "/demo-user",
-        "name": "demo-user.update",
-        "action": "App\\Http\\Controllers\\DemoUserController@update",
-        "middleware": [
-            "web"
-        ]
-    },
-    {
         "method": "GET",
         "uri": "/library",
         "name": "library.index",
         "action": "App\\Http\\Controllers\\LibraryController@index",
         "middleware": [
             "web",
-            "demo.user",
             "throttle:ask"
         ]
     },
@@ -54,7 +44,7 @@
         "action": "App\\Http\\Controllers\\ReadEntryController@destroy",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
         ]
     },
     {
@@ -64,7 +54,7 @@
         "action": "App\\Http\\Controllers\\ReadEntryController@update",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
         ]
     },
     {
@@ -74,7 +64,7 @@
         "action": "App\\Http\\Controllers\\ReadEntryController@edit",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
         ]
     },
     {
@@ -84,7 +74,7 @@
         "action": "App\\Http\\Controllers\\LogController@create",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
         ]
     },
     {
@@ -94,7 +84,47 @@
         "action": "App\\Http\\Controllers\\LogController@store",
         "middleware": [
             "web",
-            "demo.user"
+            "auth"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/signin",
+        "name": "signin",
+        "action": "App\\Http\\Controllers\\GoogleSignInController@show",
+        "middleware": [
+            "web",
+            "throttle:10,1"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/signin/google",
+        "name": "signin.google",
+        "action": "App\\Http\\Controllers\\GoogleSignInController@redirect",
+        "middleware": [
+            "web",
+            "throttle:10,1"
+        ]
+    },
+    {
+        "method": "GET",
+        "uri": "/signin/google/callback",
+        "name": "signin.google.callback",
+        "action": "App\\Http\\Controllers\\GoogleSignInController@callback",
+        "middleware": [
+            "web",
+            "throttle:10,1"
+        ]
+    },
+    {
+        "method": "POST",
+        "uri": "/signout",
+        "name": "signout",
+        "action": "App\\Http\\Controllers\\GoogleSignInController@destroy",
+        "middleware": [
+            "web",
+            "throttle:10,1"
         ]
     },
     {

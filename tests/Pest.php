@@ -62,5 +62,5 @@ pest()->extend(TestCase::class)->in('Unit');
  */
 function actingAsReader(User $user): TestCase
 {
-    return test()->withSession([CurrentUser::SESSION_KEY => $user->id]);
+    return test()->actingAs($user);
 }

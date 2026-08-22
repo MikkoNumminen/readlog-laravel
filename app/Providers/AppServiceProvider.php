@@ -2,11 +2,9 @@
 
 namespace App\Providers;
 
-use App\Services\CurrentUser;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -43,19 +41,6 @@ class AppServiceProvider extends ServiceProvider
             return is_string($ask) && trim($ask) !== ''
                 ? Limit::perMinute(10)->by($request->ip())
                 : Limit::none();
-        });
-
-        // .NET counterpart: the ambient `User` a Razor view can read without anyone
-        // passing it in. Blade has no ambient principal, so the reader switcher gets
-        // its data from a view composer rather than reaching into the container from
-        // inside the template.
-        View::composer('partials.demo-user', function ($view) {
-            $currentUser = $this->app->make(CurrentUser::class);
-
-            $view->with([
-                'demoReaders' => $currentUser->selectable(),
-                'demoReader' => $currentUser->get(),
-            ]);
         });
     }
 }

@@ -240,7 +240,7 @@ it('counts total and per-format stats for one user only', function () {
 });
 
 it('returns the twenty newest reads across all users on the public feed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->sharesPublicly()->create();
     $book = Book::factory()->create(['title' => 'Catalogue', 'open_library_id' => 'ol:shared']);
 
     foreach (range(0, 24) as $i) {
@@ -261,7 +261,7 @@ it('returns the twenty newest reads across all users on the public feed', functi
 });
 
 it('caches the public feed until a write evicts it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->sharesPublicly()->create();
     service()->logBook($user->id, logData('ol:1', 'First', '2024-01-01'));
 
     expect(service()->getRecentPublicReads())->toHaveCount(1); // populates the cache
@@ -344,7 +344,7 @@ it('recovers when it loses the race to create a shared catalogue book', function
 it('exposes no user fields at all on the public feed projection', function () {
     // .NET counterpart: the comment on PublicReadDto saying it "deliberately carries
     // no user fields". A comment is not a guarantee, so this asserts the shape.
-    $user = User::factory()->create(['name' => 'Very Private Person']);
+    $user = User::factory()->sharesPublicly()->create(['name' => 'Very Private Person']);
     service()->logBook($user->id, logData('ol:1', 'Dune', '2024-01-01'));
 
     $read = service()->getRecentPublicReads()->first();
