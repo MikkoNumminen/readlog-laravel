@@ -1,8 +1,8 @@
 {
-    "cases": 348,
-    "assertions": 1206,
-    "skipped": 3,
-    "passed": 345,
-    "files": 29,
-    "blocks": 293
+  "cases": 357,
+  "assertions": 1295,
+  "skipped": 3,
+  "passed": 345,
+  "files": 29,
+  "blocks": 293
 }
