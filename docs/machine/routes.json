@@ -93,7 +93,8 @@
         "name": "signin",
         "action": "App\\Http\\Controllers\\GoogleSignInController@show",
         "middleware": [
-            "web"
+            "web",
+            "throttle:10,1"
         ]
     },
     {
@@ -102,7 +103,8 @@
         "name": "signin.google",
         "action": "App\\Http\\Controllers\\GoogleSignInController@redirect",
         "middleware": [
-            "web"
+            "web",
+            "throttle:10,1"
         ]
     },
     {
@@ -111,7 +113,8 @@
         "name": "signin.google.callback",
         "action": "App\\Http\\Controllers\\GoogleSignInController@callback",
         "middleware": [
-            "web"
+            "web",
+            "throttle:10,1"
         ]
     },
     {
@@ -120,7 +123,8 @@
         "name": "signout",
         "action": "App\\Http\\Controllers\\GoogleSignInController@destroy",
         "middleware": [
-            "web"
+            "web",
+            "throttle:10,1"
         ]
     },
     {

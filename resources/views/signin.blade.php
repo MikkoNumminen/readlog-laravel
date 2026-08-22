@@ -14,7 +14,8 @@
         </p>
         <p class="rl-muted rl-small">
             ReadLog stores the name, e-mail address and profile picture Google gives it, and
-            nothing else. Your reading stays private unless you ask for it to be public.
+            nothing else. Your own reading is private: the library a signed-out visitor
+            browses here is the demo account's, never yours.
         </p>
     @else
         <p class="rl-muted rl-notice">

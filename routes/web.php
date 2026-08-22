@@ -29,10 +29,16 @@ Route::get('/book', [BookController::class, 'show'])->name('book.show');
 
 // Signing in with Google, and out again. .NET counterpart: the /signin and
 // /signout paths ConfigureApplicationCookie names in Program.cs.
-Route::get('/signin', [GoogleSignInController::class, 'show'])->name('signin');
-Route::get('/signin/google', [GoogleSignInController::class, 'redirect'])->name('signin.google');
-Route::get('/signin/google/callback', [GoogleSignInController::class, 'callback'])->name('signin.google.callback');
-Route::post('/signout', [GoogleSignInController::class, 'destroy'])->name('signout');
+// Throttled because they are unauthenticated and not free: starting a flow
+// writes a session row, and a callback spends an outbound call to Google that
+// holds a php-fpm worker for as long as its timeout. Ten a minute is far more
+// than a person signs in.
+Route::middleware('throttle:10,1')->group(function () {
+    Route::get('/signin', [GoogleSignInController::class, 'show'])->name('signin');
+    Route::get('/signin/google', [GoogleSignInController::class, 'redirect'])->name('signin.google');
+    Route::get('/signin/google/callback', [GoogleSignInController::class, 'callback'])->name('signin.google.callback');
+    Route::post('/signout', [GoogleSignInController::class, 'destroy'])->name('signout');
+});
 
 // Readable by anyone, signed in or not. A visitor browsing the public URL sees
 // the showcase reader's library, which is what makes the portfolio link worth

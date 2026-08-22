@@ -281,7 +281,7 @@ class ReadLogService
                 // Only accounts that opted in. The source has one reader and shows
                 // everything; this port lets anyone sign in, so an unfiltered feed
                 // would publish a stranger's reading on the front page the moment
-                // they logged a book. New accounts are private (decision 144).
+                // they logged a book. New accounts are private (decision 145).
                 ->whereHas('user', fn ($users) => $users->where('shares_publicly', true))
                 ->orderByDesc('created_at')
                 ->limit(self::PUBLIC_FEED_SIZE)

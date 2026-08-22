@@ -5,12 +5,13 @@ use App\Models\User;
 use App\Services\Auth\GoogleOAuth;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
 
 /*
 | Signing in with Google, with Google faked.
 |
-| The flow is written out rather than taken from Socialite (decision 145), so
+| The flow is written out rather than taken from Socialite (decision 147), so
 | the parts a package would have owned are the parts most worth pinning: the
 | state check, the refusal of an unverified address, account linking, and that
 | a failure ends on the sign-in page with one sentence rather than a stack trace.
@@ -183,4 +184,123 @@ it('offers no way in when Google is not configured, and says so', function () {
     $this->get('/signin')->assertOk()->assertSee('not configured')->assertDontSee('Continue with Google');
     $this->get('/signin/google')->assertRedirect(route('signin'))->assertSessionHasErrors('form');
     Http::assertNothingSent();
+});
+
+// --- What the review found, pinned so it cannot come back --------------------
+
+it('refuses an address that already belongs to another Google account, instead of a 500', function () {
+    // Google issues a new `sub` when a Workspace account is deleted and recreated
+    // on the same address. Both lookups missed, the insert hit users.email UNIQUE,
+    // and every attempt answered 500 forever.
+    User::factory()->create(['email' => 'reader@example.com', 'google_id' => 'THE-OLD-SUB', 'name' => 'The Old Account']);
+    fakeGoogle(['sub' => 'A-NEW-SUB']);
+
+    callbackWithValidState()
+        ->assertRedirect(route('signin'))
+        ->assertSessionHasErrors('form');
+
+    expect(User::query()->count())->toBe(1)
+        ->and(User::query()->sole()->google_id)->toBe('THE-OLD-SUB')  // not stolen
+        ->and(auth()->check())->toBeFalse();
+});
+
+it('lets the loser of a concurrent first sign-in use the winner\'s account', function () {
+    fakeGoogle();
+
+    // The row appears between this request's lookup and its insert, which is what
+    // a second sign-in landing at the same moment does.
+    User::query()->getConnection()->listen(function ($query) {
+        static $planted = false;
+        if (! $planted && str_contains($query->sql, 'select * from "users" where "google_id"')) {
+            $planted = true;
+            $rival = new User;
+            $rival->forceFill([
+                'name' => 'Rival', 'email' => 'reader@example.com',
+                'google_id' => '1234567890', 'email_verified_at' => now(),
+            ])->save();
+        }
+    });
+
+    callbackWithValidState()->assertRedirect(route('library.index'));
+
+    expect(User::query()->count())->toBe(1)
+        ->and(auth()->check())->toBeTrue()
+        ->and(auth()->user()->google_id)->toBe('1234567890');
+});
+
+it('comes back to the portal address after signing in, never the machine behind it', function () {
+    // url.intended is written from the raw request, before PortalPrefix has a say,
+    // so redirecting to it verbatim sent the visitor to the funnel hostname.
+    //
+    // The resets matter: PortalPrefix forces the URL root for the process, and
+    // Laravel's own test client builds a relative request URL through url(), so
+    // without them the next get('/x') would ask for /readlog-laravel/x and 404.
+    // A real deployment bootstraps the app per request, so that is a property of
+    // this harness rather than of the middleware.
+    fakeGoogle();
+    $portal = ['X-Portal-Host' => 'mikkonumminen.dev', 'X-Portal-Prefix' => '/readlog-laravel'];
+    $reset = fn () => URL::forceRootUrl(config('app.url'));
+
+    $this->withHeaders($portal)->get('/log')->assertRedirect('https://mikkonumminen.dev/readlog-laravel/signin');
+    expect(session('url.intended'))->toBe('http://localhost:8000/log');   // the machine's own address
+
+    $reset();
+    $this->withHeaders($portal)->get('/signin/google');
+    $state = session(GoogleOAuth::STATE_SESSION_KEY);
+
+    $reset();
+    $this->withHeaders($portal)
+        ->get('/signin/google/callback?code=c&state='.$state)
+        ->assertRedirect('https://mikkonumminen.dev/readlog-laravel/log');
+
+    $reset();
+});
+
+it('ignores an absolute intended url a caller managed to plant', function () {
+    fakeGoogle();
+    $this->withSession(['url.intended' => 'https://evil.test/take-me'])->get('/signin/google');
+    $state = session(GoogleOAuth::STATE_SESSION_KEY);
+
+    $response = $this->get('/signin/google/callback?code=c&state='.$state);
+
+    expect($response->headers->get('Location'))->not->toContain('evil.test');
+    $response->assertRedirect(url('/take-me'));   // path kept, host dropped
+});
+
+it('does not let a stray callback cancel a sign-in the reader really started', function () {
+    fakeGoogle();
+    $this->get('/signin/google')->assertRedirect();
+    $state = session(GoogleOAuth::STATE_SESSION_KEY);
+
+    // Somebody makes the browser follow a link to the callback with a wrong state.
+    $this->get('/signin/google/callback?code=c&state=not-it')->assertSessionHasErrors('form');
+
+    // The reader's own callback still works.
+    $this->get('/signin/google/callback?code=c&state='.$state)->assertRedirect(route('library.index'));
+    expect(auth()->check())->toBeTrue();
+});
+
+it('spends a state only once', function () {
+    fakeGoogle();
+    callbackWithValidState()->assertRedirect(route('library.index'));
+    $state = session(GoogleOAuth::STATE_SESSION_KEY);
+
+    expect($state)->toBeNull();
+});
+
+it('issues no five year remember cookie', function () {
+    fakeGoogle();
+
+    $response = callbackWithValidState();
+
+    $names = array_map(fn ($cookie) => $cookie->getName(), $response->headers->getCookies());
+    expect(collect($names)->filter(fn ($n) => str_starts_with($n, 'remember_web')))->toBeEmpty();
+});
+
+it('throttles the sign-in routes', function () {
+    foreach (range(1, 10) as $i) {
+        $this->get('/signin')->assertOk();
+    }
+
+    $this->get('/signin')->assertStatus(429);
 });

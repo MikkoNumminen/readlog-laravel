@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * release under a published advisory. Downgrading the HTTP stack of the whole app
  * to add one sign-in button is the wrong trade, so the flow is written out. It is
  * the authorization code flow with nothing optional in it, and it looks like the
- * other three HTTP clients in this codebase on purpose. See decision 145.
+ * other three HTTP clients in this codebase on purpose. See decision 147.
  *
  * Two things this deliberately does NOT do:
  *

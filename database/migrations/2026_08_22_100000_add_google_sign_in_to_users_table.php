@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Schema;
  * `shares_publicly` has no counterpart at all. The source is a single-reader app
  * whose feed shows everything; this port lets anyone sign in, which turns that
  * feed into other people's reading history on a public page. New accounts are
- * private, and only an account that opts in reaches the feed. See decision 144.
+ * private, and only an account that opts in reaches the feed. See decision 145.
  */
 return new class extends Migration
 {
