@@ -2,8 +2,8 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BookController;
-use App\Http\Controllers\DemoUserController;
 use App\Http\Controllers\FeedController;
+use App\Http\Controllers\GoogleSignInController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\ReadEntryController;
@@ -27,15 +27,23 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [FeedController::class, 'index'])->name('feed');
 Route::get('/book', [BookController::class, 'show'])->name('book.show');
 
-// Demo-only: pick which seeded reader the app acts as. See DemoUserController.
-Route::post('/demo-user', [DemoUserController::class, 'update'])->name('demo-user.update');
+// Signing in with Google, and out again. .NET counterpart: the /signin and
+// /signout paths ConfigureApplicationCookie names in Program.cs.
+Route::get('/signin', [GoogleSignInController::class, 'show'])->name('signin');
+Route::get('/signin/google', [GoogleSignInController::class, 'redirect'])->name('signin.google');
+Route::get('/signin/google/callback', [GoogleSignInController::class, 'callback'])->name('signin.google.callback');
+Route::post('/signout', [GoogleSignInController::class, 'destroy'])->name('signout');
 
-// .NET counterpart: the [Authorize] attribute on the Log, Library, Edit and
-// Account page models.
-Route::middleware('demo.user')->group(function () {
-    // ?ask= runs a local model for seconds per request; the limiter (see
-    // AppServiceProvider) applies only when that parameter is present.
-    Route::get('/library', [LibraryController::class, 'index'])->middleware('throttle:ask')->name('library.index');
+// Readable by anyone, signed in or not. A visitor browsing the public URL sees
+// the showcase reader's library, which is what makes the portfolio link worth
+// following; CurrentUser decides whose library that is. Writing needs an account.
+// ?ask= runs a local model for seconds per request; the limiter (see
+// AppServiceProvider) applies only when that parameter is present.
+Route::get('/library', [LibraryController::class, 'index'])->middleware('throttle:ask')->name('library.index');
+
+// .NET counterpart: the [Authorize] attribute on the Log, Edit and Account page
+// models. Library is no longer among them: it reads, and reading is public.
+Route::middleware('auth')->group(function () {
 
     Route::get('/library/{entry}/edit', [ReadEntryController::class, 'edit'])
         ->whereNumber('entry')

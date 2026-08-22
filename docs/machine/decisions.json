@@ -1,7 +1,7 @@
 {
     "$comment": "Generated from DECISIONS.md by readlog:docs-check --write. Append-only; never renumber.",
     "source": "DECISIONS.md",
-    "count": 143,
+    "count": 148,
     "topicIndex": [
         {
             "topic": "Authentication, and why there is none",
@@ -855,6 +855,31 @@
             "id": 143,
             "decision": "The audit's deterministic phases ship as a bundled stdlib script, not as prose the model re-executes",
             "reasoning": "Phases 0 and 1.5 need no judgement, yet the model was re-composing ~20 grep invocations per run, which is neither deterministic nor cheap, and the first run proved it by mis-quoting its own greps. `laravel-audit.py` does the fit check and every seed grep in one call, invoking git grep as an argument vector with `-e` and `--` so the dash-leading-pattern bug class cannot exist, and reporting a failed grep as an ERROR line on that check instead of a silent zero. The script's seed dict is the executable source of truth; SKILL.md's table documents it and serves as the python-less fallback, and the freshness check pins marker seeds in both so drift is caught. Same token-economy standard the other mikko skills hold themselves to."
+        },
+        {
+            "id": 144,
+            "decision": "Google is the only way in, and there is no local account form",
+            "reasoning": "The .NET port has ASP.NET Core Identity with local accounts plus an optional Google login; the Next.js original that both ports descend from has Google and nothing else. This port follows the original: passwords, lockout, reset tokens and a registration form are a lot of surface to defend on a machine in a house, for an app whose own author signs in with Google anyway. The `password` column stays nullable and unused, so the .NET parity item is still open rather than closed."
+        },
+        {
+            "id": 145,
+            "decision": "New accounts are private, and only an account that opts in reaches the public feed",
+            "reasoning": "The source is a single-reader app whose feed shows everything it has. This port lets anyone sign in, which turns that same feed into strangers' reading history on a public front page, served from a home machine. `users.shares_publicly` defaults to false, the feed filters on it, and the two seeded demo readers set it because they are fixtures that exist to be looked at. A signed-out visitor is shown the oldest public account rather than the oldest account, so the first stranger to register cannot become the showcase by accident."
+        },
+        {
+            "id": 146,
+            "decision": "Reading is public, writing needs an account",
+            "reasoning": "The public URL is a portfolio link. A login wall behind it would waste the one thing the portal was built for, so the feed, the book pages, the showcase library and the AI search stay open, and every route that writes sits behind `auth`. `library.index` is the one route deliberately outside that group."
+        },
+        {
+            "id": 147,
+            "decision": "The OAuth flow is written out rather than taken from Socialite",
+            "reasoning": "Socialite requires guzzlehttp/guzzle `^6.0|^7.0` and this app has Guzzle 8 locked; the versions that would resolve also pull a firebase/php-jwt release under a published advisory. Downgrading the HTTP stack of the whole app to add one button is the wrong trade. The flow is the authorization code flow with nothing optional in it, in the same typed-client shape as the Open Library, Google Books and Ollama clients, and the id_token is never read: the profile comes from a userinfo call this server makes to Google over TLS, so there is no signature for the app to verify and no JWT library to carry."
+        },
+        {
+            "id": 148,
+            "decision": "The snapshot crawler signs in as the showcase reader through a process-local guard",
+            "reasoning": "`/log`, `/account` and the entry editor moved behind `auth`, and a crawler that is nobody would have published a snapshot missing half of what it exists to show. Each page is its own trip through the HTTP kernel and the session store is the array driver, so there is no session to carry a login; `Auth::viaRequest` answers the same reader for every request in the process instead. It is config the command already saves and restores, and nothing serving real HTTP ever sees it."
         }
     ]
 }

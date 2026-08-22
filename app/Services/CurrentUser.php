@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Contracts\Session\Session;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Resolves who the app is acting as.
@@ -18,16 +18,16 @@ use Illuminate\Support\Collection;
  * that every service call is made on behalf of a specific user id, so the ownership
  * rules ported from ReadLogService are real and testable rather than assumed.
  *
- * When real authentication lands, this class collapses to `auth()->id()` and the
- * switcher goes away. Nothing else in the app has to change, because no controller
- * or service reaches for the session directly.
+ * Real authentication landed in the Google sign-in PR, and this class did most of
+ * what it promised: the switcher is gone and a signed-in reader is `auth()->user()`.
+ * It still exists because the app has a second kind of visitor the .NET original
+ * never had. The public URL serves the app to anyone, and a signed-out visitor is
+ * shown the showcase reader's library rather than a login wall, so "the acting
+ * reader" is still a question with two answers. Every write route is behind the
+ * `auth` middleware, so nothing a guest can reach can change anything.
  */
 class CurrentUser
 {
-    public const SESSION_KEY = 'demo_user_id';
-
-    public function __construct(private readonly Session $session) {}
-
     /**
      * The acting user, or null when the database has no users at all
      * (a migrated but unseeded install).
@@ -45,27 +45,41 @@ class CurrentUser
      */
     public function get(): ?User
     {
-        $id = $this->session->get(self::SESSION_KEY);
+        $user = Auth::user();
 
-        if ($id !== null) {
-            $user = User::find($id);
-
-            if ($user !== null) {
-                return $user;
-            }
-
-            // The session points at a user who is gone: drop the stale id rather
-            // than showing an empty library forever.
-            $this->session->forget(self::SESSION_KEY);
+        if ($user instanceof User) {
+            return $user;
         }
 
-        return User::query()->oldest('id')->first();
+        return $this->showcase();
+    }
+
+    /**
+     * The reader a signed-out visitor is shown: the oldest account that has opted
+     * into being public.
+     *
+     * Never just "the oldest account", which is what this used to return. Anyone
+     * can sign in now, and on a fresh machine the first person through the door
+     * could be a stranger; handing their library to every visitor because they
+     * happened to register first is exactly the accident `shares_publicly` exists
+     * to prevent. Returns null when nobody has opted in, which the views handle
+     * as an empty library rather than an error.
+     */
+    public function showcase(): ?User
+    {
+        return User::query()->where('shares_publicly', true)->oldest('id')->first();
+    }
+
+    /** Is the acting reader allowed to change anything? */
+    public function canWrite(): bool
+    {
+        return Auth::check();
     }
 
     /**
      * The acting user's id.
      *
-     * Callers are behind the demo.user middleware, so a user always exists
+     * Callers are behind the auth middleware, so a user always exists
      * by the time this runs; a missing one is a programming error, which is the same
      * contract the .NET GetUserId() extension states.
      */
@@ -74,24 +88,9 @@ class CurrentUser
         $user = $this->get();
 
         if ($user === null) {
-            throw new \RuntimeException('No demo user exists. Run php artisan db:seed.');
+            throw new \RuntimeException('No acting reader. Write routes are behind the auth middleware, so this is a programming error.');
         }
 
         return $user->id;
-    }
-
-    public function switchTo(User $user): void
-    {
-        $this->session->put(self::SESSION_KEY, $user->id);
-    }
-
-    /**
-     * Everyone who can be switched to, for the demo picker.
-     *
-     * @return Collection<int, User>
-     */
-    public function selectable(): Collection
-    {
-        return User::query()->oldest('id')->get();
     }
 }

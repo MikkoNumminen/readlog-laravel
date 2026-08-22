@@ -36,7 +36,7 @@
                 <li><a href="{{ route('account.show') }}" @if ($section('account.*')) aria-current="page" @endif>Account</a></li>
             </ul>
 
-            @include('partials.demo-user')
+            @include('partials.account-menu')
         </div>
     </header>
 

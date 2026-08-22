@@ -208,7 +208,7 @@ it('falls back to the cover from the query string when the provider has none', f
 
 it('reaches the book page from a feed card', function () {
     $book = Book::factory()->create(['title' => 'Dune', 'author' => 'Frank Herbert']);
-    ReadEntry::factory()->for(User::factory())->for($book)->create();
+    ReadEntry::factory()->for(User::factory()->sharesPublicly())->for($book)->create();
     Http::fake(['www.googleapis.com/*' => Http::response(['items' => []])]);
 
     $this->get('/')->assertOk()->assertSee('/book?title=Dune', false);

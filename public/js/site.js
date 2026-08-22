@@ -1,7 +1,8 @@
-// The whole of ReadLog's client-side JavaScript.
+// The whole of ReadLog's client-side JavaScript: one handler.
 //
-// .NET counterpart: wwwroot/js/site.js in readlog-dotnet, which carries the first
-// of these two handlers verbatim. Keeping behaviour here rather than in inline
+// .NET counterpart: wwwroot/js/site.js in readlog-dotnet, which carries this
+// handler verbatim. A second handler here submitted the demo reader switcher on
+// change, and went when Google sign-in replaced the switcher. Keeping behaviour here rather than in inline
 // attributes is what lets the Content-Security-Policy use a strict
 // script-src 'self' with no 'unsafe-inline'.
 (function () {
@@ -15,20 +16,6 @@
             if (!window.confirm(form.getAttribute("data-confirm"))) {
                 event.preventDefault();
             }
-        }
-    });
-
-    // Submit on change, for the demo reader switcher. Without JavaScript the form
-    // still works: a <noscript> submit button is rendered alongside it.
-    document.addEventListener("change", function (event) {
-        var control = event.target;
-        if (!(control instanceof HTMLSelectElement)) {
-            return;
-        }
-
-        var form = control.form;
-        if (form && form.hasAttribute("data-auto-submit")) {
-            form.requestSubmit ? form.requestSubmit() : form.submit();
         }
     });
 })();

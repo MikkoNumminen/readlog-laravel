@@ -42,4 +42,17 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * A reader whose finished books reach the public feed.
+     *
+     * Not the default, because the column's default is the product decision: an
+     * account that signs in with Google is private until it opts in (decision
+     * 144). The seeded showcase reader and the feed's own tests are what opt in,
+     * and they say so at the call site rather than inheriting it silently.
+     */
+    public function sharesPublicly(): static
+    {
+        return $this->state(fn () => ['shares_publicly' => true]);
+    }
 }

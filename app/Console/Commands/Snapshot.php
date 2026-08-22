@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Services\CurrentUser;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -131,6 +133,7 @@ class Snapshot extends Command
             'database.default' => Config::get('database.default'),
             'cache.default' => Config::get('cache.default'),
             'session.driver' => Config::get('session.driver'),
+            'auth.defaults.guard' => Config::get('auth.defaults.guard'),
         ];
 
         try {
@@ -151,6 +154,7 @@ class Snapshot extends Command
             Config::set('database.default', $previous['database.default']);
             Config::set('cache.default', $previous['cache.default']);
             Config::set('session.driver', $previous['session.driver']);
+            Config::set('auth.defaults.guard', $previous['auth.defaults.guard']);
         }
 
         $this->newLine();
@@ -222,6 +226,38 @@ class Snapshot extends Command
         $silent = new NullOutput;
         Artisan::call('migrate:fresh', ['--database' => 'snapshot', '--force' => true], $silent);
         Artisan::call('db:seed', ['--class' => 'DemoLibrarySeeder', '--database' => 'snapshot', '--force' => true], $silent);
+
+        $this->crawlAsShowcaseReader();
+    }
+
+    /**
+     * The crawl signs in as the showcase reader, for the length of this command.
+     *
+     * Since Google sign-in landed, `/log`, `/account` and the entry editor sit
+     * behind the `auth` middleware. A crawler that is nobody gets three redirects
+     * instead of three pages, and the published snapshot quietly loses the log
+     * form and the stats page, which are half of what it exists to show.
+     *
+     * A custom guard rather than a session: every page is a separate trip through
+     * the HTTP kernel and the session store is the array driver, so there is no
+     * session to carry a login between them. `viaRequest` answers the same reader
+     * for every request in this process, which is exactly the crawl's model of the
+     * world. It is process-local config, restored with the rest in handle(), and
+     * nothing that serves real HTTP ever sees it.
+     */
+    private function crawlAsShowcaseReader(): void
+    {
+        $reader = app(CurrentUser::class)->showcase();
+
+        if ($reader === null) {
+            $this->components->warn('No showcase reader in the seeded data; pages behind sign-in will be skipped.');
+
+            return;
+        }
+
+        Auth::viaRequest('snapshot', fn () => $reader);
+        Config::set('auth.guards.snapshot', ['driver' => 'snapshot']);
+        Config::set('auth.defaults.guard', 'snapshot');
     }
 
     /** Written into every snapshot; its presence is what makes a directory safe to wipe. */

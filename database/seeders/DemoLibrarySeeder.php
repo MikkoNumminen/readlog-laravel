@@ -134,7 +134,7 @@ class DemoLibrarySeeder extends Seeder
         return Carbon::create(2026, 8, 18, 0, 0, 0, 'UTC');
     }
 
-    private function reader(string $name, string $email): User
+    private function reader(string $name, string $email, bool $sharesPublicly = true): User
     {
         // Assigned property by property rather than through updateOrCreate, on purpose.
         // email_verified_at is not on the User mass-assignment allowlist, so fill()
@@ -147,6 +147,12 @@ class DemoLibrarySeeder extends Seeder
         // Version 1 has no login, so this hash is never checked. It is set so that the
         // column is valid the day authentication is added.
         $user->password = Hash::make('password');
+        // Both seeded readers are public: they are demo data, they exist to be
+        // looked at, and the front page and the snapshot are built from them. The
+        // private-by-default rule in the migration is about people who sign in
+        // with Google, not about fixtures. CurrentUser::showcase() shows the
+        // oldest of these to a signed-out visitor.
+        $user->shares_publicly = $sharesPublicly;
         $user->save();
 
         return $user;

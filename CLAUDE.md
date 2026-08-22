@@ -17,7 +17,7 @@ actually was.
 ## Before you change behaviour
 
 This repository is a deliberate port of an ASP.NET Core app, and several of its
-oddities are faithful copies rather than bugs. `DECISIONS.md` has 143 numbered
+oddities are faithful copies rather than bugs. `DECISIONS.md` has 148 numbered
 entries explaining them. Search it before you decide something is wrong:
 
 ```bash
