@@ -26,7 +26,7 @@ Procedure: **run the bundled script** — it performs this pre-flight AND Phase 
 python .claude/skills/mikko-laravel-audit/laravel-audit.py [--source PATH] [--json]
 ```
 
-Exit 0 = proceed (candidate map follows on stdout); exit 2 = pre-flight bail, nothing else runs; exit 3 = a seed grep ERRORED (the healthy checks' candidates still print — investigate the errored check before trusting the run). If python is unavailable, fall back to the manual steps below; they and the script's decision matrix are the same:
+Exit 0 = proceed; exit 2 = pre-flight bail; exit 3 = a seed grep ERRORED (healthy checks still print — investigate before trusting the run); exit 64 = bad invocation (unknown flag, missing `--source` path). **Key on the output text, not only the code**: a bail always prints a line starting `pre-flight: aborting`, while a bare interpreter failure (wrong script path) also exits 2 but prints no such line. `--force` overrides a fit-matrix bail, never a structural one: git missing or not-a-work-tree stay fatal, because the candidate pass IS git grep. On anything but a small repo pass `--out FILE` — the full map goes to the file and stdout carries only the summary, so a tool-output cap cannot silently truncate the trailing groups into "cleanly skipped". If python is unavailable, fall back to the manual steps below; they and the script's decision matrix are the same:
 
 1. **`Glob` for `composer.json` + `artisan`** at the root. Read `composer.json`'s `require` for `laravel/framework` and the PHP constraint.
 2. **`Glob` for hand-written PHP** under `app/` (this is the Laravel convention; `vendor/` is never counted) and **Blade templates** under `resources/views/`.
@@ -34,6 +34,8 @@ Exit 0 = proceed (candidate map follows on stdout); exit 2 = pre-flight bail, no
 
 | `laravel/framework` in composer.json? | hand-written `app/**.php`? | Verdict |
 | --- | --- | --- |
+| (git missing, or not a git work tree) | any | **Bail, not forceable** — the candidate pass reads tracked files via git grep, so without git there is nothing to gather. |
+| Yes | files exist but none are git-tracked | **Bail, forceable** — git grep reads the index, so a fresh scaffold would audit as empty. `git add` first. |
 | Yes | Many (≥10) | **Proceed.** If no Blade templates, skip the web-surface checks that need them and say so. |
 | Yes | Few (1–9) | **Proceed with note** — "small surface, patterns may not show at scale". |
 | Yes | None | **Bail** — "framework installed but no app code found; pass `--source <path>`." |
@@ -42,7 +44,7 @@ Exit 0 = proceed (candidate map follows on stdout); exit 2 = pre-flight bail, no
 
 Output one of:
 
-- `pre-flight: Laravel codebase confirmed (laravel/framework <version>, N app/ files, M Blade templates). Proceeding.`
+- `pre-flight: Laravel codebase confirmed (laravel/framework <version>, N tracked app/ files, M Blade templates, K untracked PHP). Proceeding.`
 - `pre-flight: aborting — <reason>. Suggested alternative: <skill-name>.`
 
 If the pre-flight bails, no audit runs and no report is written.
@@ -307,38 +309,73 @@ Run from the repo root; capture output off-context; skip cleanly with a one-line
 
 ### Phase 1.5 — candidate gathering (deterministic, no AI tokens)
 
-**Normally already done**: the bundled `laravel-audit.py` executed every seed during Phase 0 and printed the map (per-check counts, zero-candidate list, grouped `file:line` sites, and an explicit ERROR line for any grep that failed rather than a silent zero). The script invokes git grep as an argument vector with `-e` and `--`, so dash-leading and quote-bearing patterns are structurally safe. **The script's seed table is the executable source of truth; the table below documents it and is the manual fallback** — change them together (the freshness check pins both).
+**Normally already done**: the bundled `laravel-audit.py` executed every seed during Phase 0 and printed the map: a `counts:` line covering every check, the zero-candidate list, the grouped `file:line` sites, and a named line for every way a zero can lie — `ERROR` (the grep failed), `SKIPPED` (the check's scope directories do not exist here), `PARTIAL` (some of them do not). Only an ordinary zero means searched-and-clean. Merged seed ids (B12, C12, E12, B1_blade) cover two checks or feed one; judges tag findings with the specific check id. The script invokes git grep as an argument vector with `-e` and `--`, so dash-leading and quote-bearing patterns are structurally safe. **The script's seed table is the executable source of truth; the table below documents it and is the manual fallback** — change them together (the freshness check pins both).
 
 Manual fallback, only when python is unavailable:
 
 `git grep -nE -e "<pattern>" -- <paths>` over tracked files (which already excludes `vendor/` and `storage/` via .gitignore), one pass per seed pattern, scoped to the paths shown. **The `-e` is mandatory, not style**: five seeds begin with `->`, and without `-e` git grep parses them as options and yields a silent zero — the first run shipped exactly this bug and lost six checks to it until an impossible zero (on `$request->query(`, which exists in any Laravel controller) exposed it. Double-quote patterns for the shell; the C4 seed uses a `.` wildcard precisely so no seed has to embed a quote. Collect `{check, file:line, matched text}`, build the map grouped A–E, record per-check counts, and **gate dispatch**: a group with zero candidates is not dispatched.
 
-| Check | Seed (`git grep -nE`) | Scope | Judge narrows on |
-| --- | --- | --- | --- |
-| A1 | `\benv\(` | `app/ routes/ resources/ database/` | any hit outside config/ is a candidate |
-| A2 | `->singleton\(\|->scoped\(\|->instance\(` | `app/` | bound class holds Session/Request/user state |
-| A3 | `\bsession\(\|\brequest\(\|\bauth\(\|Session::\|Auth::` | `app/Services/ app/Support/ app/Models/` | not CurrentUser; not constructor-injected contracts |
-| A4 | `Config::set\|config\(\[` | `app/` | no save+restore in finally |
-| B1 | `->get\(\)\|::all\(\)` | `app/` | relation walked per-row downstream w/o with() |
-| B1 (Blade) | `->[a-zA-Z_]+->` | `resources/views/` | a relation chain echoed inside a loop |
-| B2 | `->get\(\)\|::all\(\)` | `app/` | growable table, no bound, no decision cover |
-| B3 | `->all\(\)\|guarded\|forceFill` | `app/` | request-fed, not validated()/DTO |
-| B4 | `DB::raw\|whereRaw\|selectRaw\|orderByRaw\|havingRaw\|statement\(` | `app/ database/` | variable interpolated vs `?` bindings |
-| B5 | `->exists\(\)\|firstOrCreate\|updateOrCreate` | `app/` | unique index + no violation handling |
-| B6 | `strftime\|ILIKE\|json_extract\|::text\|::date\|RANDOM\(\)` | `app/ database/` | engine-specific behaviour |
-| C1, C2 | `Http::` | `app/` | timeout absent; body read unguarded |
-| C3 | `Log::` | `app/` | message can embed a credentialled URL |
-| C4 | `file_get_contents\(.http\|curl_init\|new Client\(` | `app/ tests/` | bypasses the Http facade |
-| D1 | `\{!!` | `resources/views/` | value not sanitised upstream |
-| D2 | `Route::get` | `routes/` | handler writes state |
-| D3 | `::find\(\|findOrFail\(` | `app/` | owned table, no user_id scope |
-| D4 | `redirect\(\|->away\(` | `app/` | request-supplied target |
-| D5 | `->query\(\|->input\(` | `app/Http/` | no shape guard before use |
-| D6 | `\$except\|validateCsrfTokens` | `app/ bootstrap/` | any exemption |
-| E1, E2 | `catch\s*\(` | `app/` | empty / silent / eats framework signals |
-| E3 | `storage_path\(\|sys_get_temp_dir\(\|tempnam\(` | `app/ tests/` | fixed name, shared between processes |
-| E4 | `Cache::\|cache\(` | `app/` | non-scalar payload |
-| E5 | `\bnow\(\)\|\btoday\(\)\|Carbon::now\|CarbonImmutable::now` | `app/ database/` | determinism-relevant site |
+The fenced block below is the copy source. It is deliberately NOT a markdown
+table: a table cell needs its pipes escaped as `\|`, and POSIX ERE reads an
+escaped pipe as a literal character, so a pattern pasted from a table silently
+matches nothing (measured: 17 of 24 rows). Inside the fence every pipe is real.
+Fields are separated by ` :: `; merged ids share one seed between two checks
+(B12 = B1+B2, C12 = C1+C2, E12 = E1+E2; B1_blade feeds B1).
+
+```text
+check :: ERE pattern :: pathspecs
+A1 :: \benv\( :: app routes resources database
+A2 :: ->singleton\(|->scoped\(|->instance\( :: app
+A3 :: \bsession\(|\brequest\(|\bauth\(|Session::|Auth:: :: app/Services app/Support app/Models
+A4 :: Config::set|config\(\[ :: app
+B12 :: ->get\(\)|::all\(\) :: app
+B1_blade :: ->[a-zA-Z_]+-> :: resources/views
+B3 :: ->all\(\)|guarded|forceFill :: app
+B4 :: DB::raw|whereRaw|selectRaw|orderByRaw|havingRaw|DB::statement\(|->statement\( :: app database
+B5 :: ->exists\(\)|firstOrCreate|updateOrCreate :: app
+B6 :: strftime|ILIKE|json_extract|::text|::date|RANDOM\(\) :: app database
+C12 :: Http:: :: app
+C3 :: Log:: :: app
+C4 :: file_get_contents\(.http|curl_init|new Client\( :: app tests
+D1 :: \{!! :: resources/views
+D2 :: Route::get :: routes
+D3 :: ::find\(|findOrFail\( :: app
+D4 :: redirect\(|->away\( :: app
+D5 :: ->query\(|->input\( :: app/Http
+D6 :: \$except|validateCsrfTokens :: app bootstrap
+E12 :: catch[[:space:]]*\( :: app tests
+E3 :: storage_path\(|sys_get_temp_dir\(|tempnam\( :: app tests
+E4 :: Cache::|\bcache\( :: app
+E5 :: \bnow\(\)|\btoday\(\)|Carbon::now|CarbonImmutable::now :: app database
+```
+
+What the judge narrows each check on (patternless, so the table form is safe):
+
+| Check | Judge narrows on |
+| --- | --- |
+| A1 | any hit outside config/ is a candidate |
+| A2 | bound class holds Session/Request/user state |
+| A3 | not CurrentUser; not constructor-injected contracts |
+| A4 | no save+restore in finally |
+| B12 | B1: relation walked per-row downstream without with(); B2: growable table, no bound, no decision cover |
+| B1_blade | a relation chain echoed inside a loop |
+| B3 | request-fed create/fill/update, not validated()/DTO |
+| B4 | variable interpolated vs bound with ? placeholders |
+| B5 | unique index + no violation handling |
+| B6 | engine-specific behaviour between SQLite and Postgres |
+| C12 | C1: timeout absent; C2: body read unguarded |
+| C3 | message can embed a credentialled URL |
+| C4 | bypasses the Http facade |
+| D1 | value not sanitised upstream |
+| D2 | handler writes state |
+| D3 | owned table, no user_id scope |
+| D4 | request-supplied target |
+| D5 | no shape guard before use |
+| D6 | any exemption |
+| E12 | E1: empty or silent catch; E2: eats framework signals |
+| E3 | fixed name, shared between processes |
+| E4 | non-scalar payload |
+| E5 | determinism-relevant site |
 
 ### Phase 2 — parallel subagents (up to five, candidate-gated)
 
@@ -348,11 +385,11 @@ Append to every subagent prompt:
 
 > You are handed a candidate list — file:line sites a deterministic grep pre-pass found for your group's checks. **Judge each candidate; do not scan the tree for new ones.** Read ±10 lines of context; follow a pointer one hop (a config key to its definition, a variable to its source) but don't prospect beyond it. This repository documents its deliberate oddities in DECISIONS.md (topic-indexed at the top) and docs/INVARIANTS.md ("pinned on purpose"); a documented behaviour is immune. Output one line per finding, exact template (no em dash anywhere — the report must pass this repo's docs-check):
 > `` - `path/File.php:NN` [severity] <check-id>: one-line description ``
-> severity ∈ {critical, high, medium, low}. Emit nothing for a candidate matching the legitimate counter-example. Every finding cites a real file:line. Cap your reply at ~400 words.
+> severity ∈ {critical, high, medium, low}. Emit nothing for a candidate matching the legitimate counter-example. Candidates arrive under seed ids; a merged id (B12, C12, E12, B1_blade) spans two checks or feeds one — tag every finding with the specific check id, never the seed id. Every finding cites a real file:line. Cap your reply at ~400 words.
 
 ### Phase 3 — aggregated report
 
-Write `docs/audits/laravel-<YYYY-MM-DD>.md` (create the directory if absent; suffix `-v2` on a same-date collision — never overwrite). Recount the severity tally so the summary matches the body exactly. The report lands in the audited tree's own `docs/audits/`. **Then run the documentation gate**: in this repository that is `php artisan readlog:docs-check`, fixed until it passes. On another Laravel tree (`--source` elsewhere) that command does not exist; run that repo's own docs gate if it has one, otherwise skip the step and record the skip on the report's Coverage line.
+Write `docs/audits/laravel-<YYYY-MM-DD>.md` (create the directory if absent; suffix `-v2` on a same-date collision — never overwrite). Recount the severity tally so the summary matches the body exactly. Tally rows may merge checks sharing a seed (B1/B2, C1/C2, E1/E2), mirroring the script's merged ids; findings themselves always carry the specific check id. The report lands in the audited tree's own `docs/audits/`. **Then run the documentation gate**: in this repository that is `php artisan readlog:docs-check`, fixed until it passes. On another Laravel tree (`--source` elsewhere) that command does not exist; run that repo's own docs gate if it has one, otherwise skip the step and record the skip on the report's Coverage line.
 
 ### Phase 4 — reviewed fix PRs (opt-in, `--prs`)
 
@@ -422,13 +459,14 @@ is what makes a zero auditable; without it a clean run is just an assertion.}
 ## Flags
 
 - `--source <path>` — audit only the given directory.
-- `--force` — bypass the pre-flight bail; recorded in the report header.
+- `--force` — override a fit-matrix bail (printed as OVERRIDDEN, recorded in the report header). Structural bails are not overridable: without git, or outside a work tree, there is nothing to gather, and forcing the wrong tree buys zeros, not findings.
+- `--out FILE` — write the full candidate map to FILE; stdout keeps only the summary. Use on anything but a small repo: tool-output caps truncate stdout silently, and a truncated map reads as cleanly-skipped groups.
 - `--prs` — after the report, land the findings as reviewed fix PRs (Phase 4): area-named branches, gate-green commits, self-reviewed PR bodies, a high-effort machine review per PR, and every confirmed review finding fixed before handing over. No-op on a zero-finding run. Never merges.
 
 ## Failure modes
 
 - **A zero from a tool is a claim to verify, not a fact.** The first run's candidate pass silently zeroed six checks: five seed patterns begin with `->` and git grep parsed them as command options. The tell was a zero on a pattern that could not be zero. The bundled script closes the bug class (argument-vector invocation, per-check ERROR lines instead of silent zeros), and the manual fallback mandates `-e`; a surprising zero-candidate check still gets re-verified against a known call site before its group is skipped.
-- **Two copies of the seed table can drift.** The script's `SEEDS` dict is executable truth; SKILL.md's table is documentation and fallback. An edit to one without the other makes the fallback and the normal path audit different things. Change them together; the freshness check asserts both files exist and both name the shared marker seeds.
+- **Two copies of the seed table can drift.** The script's `SEEDS` dict is executable truth; SKILL.md's table is documentation and fallback. An edit to one without the other makes the fallback and the normal path audit different things. Change them together in the same commit. The freshness markers (`B1_blade`, `B1 (Blade)`, `DB::statement` in both files) catch gross drift only, not cell-level drift — the PR 27 review found four cells already differing under weaker markers — so the binding rule is the human one, and the fenced block is the fallback's only copy source.
 - **`git grep` misses untracked new files.** Files added but never `git add`ed escape the candidate pass; `git status` in the pre-flight notes any untracked PHP so the reader knows.
 - **The Blade N+1 seed sees echoed chains only.** `->[a-zA-Z_]+->` in `resources/views/` catches a relation chain echoed in a template; a chain assembled in a PHP variable before the loop, or a lazy load reached through a candidate-free call path, still escapes. Group B's judgment of the `->get()` sites covers most of the rest.
 - **Heuristic matching.** Ownership scoping (D3) and singleton statefulness (A2) need the auditor to connect a call site to a class definition — expect occasional false positives; the counter-example column tells the reader when a hit is fine.
@@ -492,5 +530,17 @@ pattern = "B1_blade"
 kind = "file_contains"
 path = "SKILL.md"
 root = "skill_dir"
-pattern = "B1 \(Blade\)"
+pattern = 'B1 \(Blade\)'
+
+[[check]]
+kind = "file_contains"
+path = "laravel-audit.py"
+root = "skill_dir"
+pattern = "DB::statement"
+
+[[check]]
+kind = "file_contains"
+path = "SKILL.md"
+root = "skill_dir"
+pattern = "DB::statement"
 ```
